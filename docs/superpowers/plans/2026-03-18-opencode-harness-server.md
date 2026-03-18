@@ -205,7 +205,7 @@ Expected: tests PASS and Docker build exits 0
 
 - [ ] **Step 1: Start the built image with a writable temp workspace**
 
-Run: `docker run --rm -d --name opencode-harness-smoke -p 127.0.0.1:4096:4096 -p 127.0.0.1:48801:48801 -v "$(pwd):/workspace" opencode-harness`
+Run: `docker run -d --name opencode-harness-smoke -p 127.0.0.1:4096:4096 -p 127.0.0.1:48801:48801 -v "$(pwd):/workspace" opencode-harness`
 Expected: container starts successfully
 
 - [ ] **Step 2: Verify runtime health and config**
@@ -216,7 +216,7 @@ Expected: health endpoint responds, config shows the baked plugin paths, and OCA
 - [ ] **Step 3: Verify operator access flow is documented and runnable**
 
 Run: `docker exec -it opencode-harness-smoke opencode auth login`
-Expected: login flow starts, shows the `oca` provider, and documents the public redirect target `http://127.0.0.1:48801/auth/oca`
+Expected: login flow starts, shows the `oca` provider, documents the public redirect target `http://127.0.0.1:48801/auth/oca`, and the README explains that restarting the same container keeps auth while deleting the container requires logging in again unless the optional `.opencode-state` backup mount is reused
 
 - [ ] **Step 4: Verify TUI attach, Web UI access, and default model smoke command are documented**
 

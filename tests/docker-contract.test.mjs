@@ -41,15 +41,24 @@ test('Docker build validates vendor sources against sources.lock.json', async ()
 
 test('README documents the shared image tag and operator flow', async () => {
   const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
+  const gitignore = await readFile(new URL('../.gitignore', import.meta.url), 'utf8');
+  const dockerignore = await readFile(new URL('../.dockerignore', import.meta.url), 'utf8');
 
   assert.match(readme, /opencode-harness\b/);
   assert.doesNotMatch(readme, /dc-opencode-harness\b/);
   assert.doesNotMatch(readme, /dc-opencode-harness:dev/);
   assert.match(readme, /<host-project-workspace>:\/workspace/);
-  assert.match(readme, /docker run --rm -it \\\n  --name opencode-harness/);
+  assert.doesNotMatch(readme, /docker run --rm -it/);
+  assert.match(readme, /docker run -it \\\n+  --name opencode-harness/);
+  assert.match(readme, /docker start -ai opencode-harness/);
   assert.match(readme, /docker exec -it opencode-harness opencode auth login/);
   assert.match(readme, /what skills do you have\? what mcp do you have/);
   assert.match(readme, /http:\/\/127\.0\.0\.1:4096/);
+  assert.match(readme, /mkdir -p \.opencode-state/);
+  assert.match(readme, /\.\/\.opencode-state:\/root\/\.local\/share\/opencode/);
+  assert.match(readme, /if you delete the container, you must run `docker exec -it opencode-harness opencode auth login` again unless you reuse the optional `\.\/\.opencode-state` backup mount/i);
+  assert.match(gitignore, /^\.opencode-state\/$/m);
+  assert.match(dockerignore, /^\.opencode-state\/$/m);
 });
 
 test('vendor trees include both pinned upstream source snapshots', async () => {

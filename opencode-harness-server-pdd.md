@@ -172,7 +172,7 @@ docker build -f Dockerfile -t opencode-harness .
 ### Run
 
 ```bash
-docker run --rm -it \
+docker run -it \
   --name opencode-harness \
   -p 127.0.0.1:4096:4096 \
   -p 127.0.0.1:48801:48801 \
@@ -181,12 +181,31 @@ docker run --rm -it \
 ```
 
 Replace `<host-project-workspace>` with the host path of the project you want OpenCode to operate on.
+If the engineer stops and later restarts the same container with `docker start -ai opencode-harness`, the container keeps its auth state and does not require another login.
+
+### Optional Auth-State Backup
+
+Create a local backup directory if auth should survive deleting and recreating the container:
+
+```bash
+mkdir -p .opencode-state
+```
+
+Add this extra mount to `docker run`:
+
+```bash
+-v "./.opencode-state:/root/.local/share/opencode"
+```
+
+The local `./.opencode-state/` directory stores auth/session state outside the container and must be gitignored.
 
 ### OAuth Login
 1. Start login from the running container shell, for example: `docker exec -it opencode-harness opencode auth login`
 2. Choose `oca` provider
 3. On host, the engineer opens the given URL in a browser and completes the OAuth flow.
 4. Browser redirects to `http://127.0.0.1:48801/auth/oca`
+
+If the container is deleted, the engineer must run `docker exec -it opencode-harness opencode auth login` again before OCA prompts will work unless the optional auth-state backup mount is reused.
 
 ### Connect via TUI
 ```bash
