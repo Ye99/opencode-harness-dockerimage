@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "oca/gpt-5.4",
+  "server": {
+    "port": 4096,
+    "hostname": "0.0.0.0"
+  },
+  "plugin": [
+    "file:///opt/opencode/plugins/opencode-oca-auth",
+    "file:///opt/opencode/plugins/superpowers.js"
+  ],
+  "provider": {
+    "oca": {
+      "models": {
+        "gpt-5.4": {}
+      }
+    }
+  }
+}

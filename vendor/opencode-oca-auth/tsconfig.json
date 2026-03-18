@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "types": ["bun-types"],
+    "allowJs": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "index.ts",
+    "packages/**/*.ts",
+    "scripts/**/*.js",
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "config/**/*.json"
+  ]
+}
