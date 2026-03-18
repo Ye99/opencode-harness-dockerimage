@@ -27,6 +27,7 @@ test('Dockerfile installs opencode-ai 1.2.27 and declares the required env contr
   const dockerfile = await readText('../Dockerfile');
   assert.match(dockerfile, /opencode-ai@1\.2\.27/);
   assert.match(dockerfile, /OPENCODE_CONFIG=/);
+  assert.match(dockerfile, /OPENCODE_PERMISSION_JSON=/);
   assert.match(dockerfile, /OCA_OAUTH_CALLBACK_PORT=48801/);
   assert.match(dockerfile, /SUPERPOWERS_SKILLS_DIR=\/opt\/opencode\/skills\b/);
 });
@@ -63,6 +64,51 @@ test('config/opencode.json keeps the base OpenCode server and plugin contract', 
     'file:///opt/opencode/plugins/superpowers.js',
   ]);
   assert.deepEqual(config.provider?.oca?.models?.['gpt-5.4'], {});
+});
+
+test('config/opencode.json keeps the workspace-trusting default permission policy', async () => {
+  const config = await readJson('../config/opencode.json');
+
+  assert.deepEqual(config.permission, {
+    read: {
+      '*': 'allow',
+      '*.env': 'deny',
+      '*.env.*': 'deny',
+      '*.env.example': 'allow',
+    },
+    edit: 'allow',
+    glob: 'allow',
+    grep: 'allow',
+    list: 'allow',
+    bash: {
+      '*': 'allow',
+      'git push': 'ask',
+      'git push *': 'ask',
+      'git push *--force*': 'deny',
+      'git push *--mirror*': 'deny',
+      'git clean': 'ask',
+      'git reset --hard*': 'ask',
+      'git clean *': 'ask',
+      rm: 'ask',
+      'rm *': 'ask',
+      'rm -rf /': 'deny',
+      'rm -rf /*': 'deny',
+      'rm -rf ~': 'deny',
+      'rm -rf ~/*': 'deny',
+      sudo: 'deny',
+      'sudo *': 'deny',
+    },
+    task: 'allow',
+    skill: 'allow',
+    lsp: 'allow',
+    todoread: 'allow',
+    todowrite: 'allow',
+    webfetch: 'allow',
+    websearch: 'allow',
+    codesearch: 'allow',
+    external_directory: 'ask',
+    doom_loop: 'ask',
+  });
 });
 
 test('config/opencode.json keeps the remote MCP discovery entries enabled', async () => {
@@ -154,6 +200,23 @@ test('README documents the Brave env workflow and disabled-by-default fallback',
   assert.match(readme, /export BRAVE_API_KEY=/);
   assert.match(normalizedReadme, /if `?BRAVE_API_KEY`? is unset, the container still starts/i);
   assert.match(normalizedReadme, /`?brave-search`? disabled/i);
+});
+
+test('README documents harness permission defaults and operator overrides', async () => {
+  const readme = await readText('../README.md');
+  const normalizedReadme = normalizeWhitespace(readme);
+
+  assert.match(readme, /OPENCODE_PERMISSION_JSON/);
+  assert.match(readme, /https:\/\/opencode\.ai\/docs\/permissions\//);
+  assert.match(normalizedReadme, /good default permissions out of the box/i);
+  assert.match(readme, /OPENCODE_PERMISSION_JSON[\s\S]*headless OpenCode service itself[\s\S]*browser UI and `opencode attach http:\/\/127\.0\.0\.1:4096` use the same permission policy/i);
+  assert.match(normalizedReadme, /insert this extra `?-e`? line into `?docker run`?/i);
+  assert.match(readme, /-e OPENCODE_PERMISSION_JSON='<full-permission-json>' \\/);
+  assert.match(normalizedReadme, /next to `?-e BRAVE_API_KEY`?/i);
+  assert.match(normalizedReadme, /replaces the entire default `?permission`? block/i);
+  assert.match(normalizedReadme, /author a full json value/i);
+  assert.doesNotMatch(readme, /-e OPENCODE_PERMISSION_JSON='\{"bash":/);
+  assert.doesNotMatch(readme, /```bash\s*docker run -it\s*\\\s*--name opencode-harness\s*\\\s*-e OPENCODE_PERMISSION_JSON=/);
 });
 
 test('vendor trees include both pinned upstream source snapshots', async () => {

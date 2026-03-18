@@ -27,6 +27,7 @@ RUN apt-get update \
 FROM node:22-slim
 
 ENV OPENCODE_CONFIG=/opt/opencode/opencode.json \
+    OPENCODE_PERMISSION_JSON= \
     OPENCODE_CONFIG_DIR=/opt/opencode \
     OPENCODE_SERVER_PORT=4096 \
     OPENCODE_SERVER_HOST=0.0.0.0 \

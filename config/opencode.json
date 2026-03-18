@@ -16,6 +16,46 @@
       }
     }
   },
+  "permission": {
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow"
+    },
+    "edit": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "bash": {
+      "*": "allow",
+      "git push": "ask",
+      "git push *": "ask",
+      "git push *--force*": "deny",
+      "git push *--mirror*": "deny",
+      "git clean": "ask",
+      "git reset --hard*": "ask",
+      "git clean *": "ask",
+      "rm": "ask",
+      "rm *": "ask",
+      "rm -rf /": "deny",
+      "rm -rf /*": "deny",
+      "rm -rf ~": "deny",
+      "rm -rf ~/*": "deny",
+      "sudo": "deny",
+      "sudo *": "deny"
+    },
+    "task": "allow",
+    "skill": "allow",
+    "lsp": "allow",
+    "todoread": "allow",
+    "todowrite": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "codesearch": "allow",
+    "external_directory": "ask",
+    "doom_loop": "ask"
+  },
   "mcp": {
     "context7": {
       "type": "remote",

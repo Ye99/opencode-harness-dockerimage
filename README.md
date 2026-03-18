@@ -46,6 +46,14 @@ Replace `<host-project-workspace>` with the writable host path of the project yo
 
 Obtain a Brave Search API key first, then export `BRAVE_API_KEY` in the shell that launches `docker run`. If `BRAVE_API_KEY` is unset, the container still starts and the rendered config keeps `brave-search` disabled.
 
+The harness ships with good default permissions out of the box. If operators need a different policy, set `OPENCODE_PERMISSION_JSON`; it replaces the entire default `permission` block and applies to the headless OpenCode service itself, so both the browser UI and `opencode attach http://127.0.0.1:4096` use the same permission policy. Author a full JSON value first and do not pass a partial object; see <https://opencode.ai/docs/permissions/>.
+
+```bash
+-e OPENCODE_PERMISSION_JSON='<full-permission-json>' \
+```
+
+Insert this extra `-e` line into `docker run` next to `-e BRAVE_API_KEY`.
+
 If you `docker stop opencode-harness` and later `docker start -ai opencode-harness`, the same container keeps its auth state, so you do not need to log in again.
 
 ## Optional auth-state backup
