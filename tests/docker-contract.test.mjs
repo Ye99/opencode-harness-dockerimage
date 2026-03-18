@@ -165,15 +165,19 @@ test('entrypoint invokes the packaged verify-runtime script from the image path'
   assert.match(entrypoint, /\/opt\/opencode\/scripts\/verify-runtime\.sh/);
 });
 
-test('entrypoint renders the live config before preflight and then starts opencode web', async () => {
+test('entrypoint renders the live config before preflight and then supervises opencode web', async () => {
   const entrypoint = await readText('../scripts/opencode-harness-entrypoint');
   const mkdirIndex = entrypoint.indexOf('mkdir -p "$(dirname "$OPENCODE_CONFIG")"');
   const renderIndex = entrypoint.indexOf('node "/opt/opencode/scripts/render-opencode-config.mjs" "/opt/opencode/opencode.base.json" "$OPENCODE_CONFIG"');
   const preflightIndex = entrypoint.indexOf('bash "/opt/opencode/scripts/verify-runtime.sh" preflight');
-  const startupIndex = entrypoint.indexOf('exec opencode web --hostname "$OPENCODE_SERVER_HOST" --port "$OPENCODE_SERVER_PORT"');
+  const startupIndex = entrypoint.indexOf('opencode web --hostname "$OPENCODE_SERVER_HOST" --port "$OPENCODE_SERVER_PORT"');
 
   assert.match(entrypoint, /mkdir -p "\$\(dirname "\$OPENCODE_CONFIG"\)"/);
   assert.match(entrypoint, /node "\/opt\/opencode\/scripts\/render-opencode-config\.mjs" "\/opt\/opencode\/opencode\.base\.json" "\$OPENCODE_CONFIG"/);
+  assert.match(entrypoint, /AUTH_FILE=/);
+  assert.match(entrypoint, /while true; do/);
+  assert.match(entrypoint, /auth-change-restart/);
+  assert.match(entrypoint, /setsid opencode web --hostname "\$OPENCODE_SERVER_HOST" --port "\$OPENCODE_SERVER_PORT"/);
   assert.notEqual(mkdirIndex, -1);
   assert.notEqual(renderIndex, -1);
   assert.notEqual(preflightIndex, -1);
