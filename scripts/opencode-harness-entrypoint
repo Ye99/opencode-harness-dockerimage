@@ -12,6 +12,8 @@ export SUPERPOWERS_SKILLS_DIR="${SUPERPOWERS_SKILLS_DIR:-/opt/opencode/skills}"
 export WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
 export BROWSER="${BROWSER:-/bin/true}"
 
+mkdir -p "$(dirname "$OPENCODE_CONFIG")"
+node "/opt/opencode/scripts/render-opencode-config.mjs" "/opt/opencode/opencode.base.json" "$OPENCODE_CONFIG"
 bash "/opt/opencode/scripts/verify-runtime.sh" preflight
 cd "$WORKSPACE_DIR"
 exec opencode web --hostname "$OPENCODE_SERVER_HOST" --port "$OPENCODE_SERVER_PORT"

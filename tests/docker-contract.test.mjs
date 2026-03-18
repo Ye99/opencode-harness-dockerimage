@@ -2,27 +2,85 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 
+async function readText(relativePath) {
+  return readFile(new URL(relativePath, import.meta.url), 'utf8');
+}
+
+async function readJson(relativePath) {
+  return JSON.parse(await readText(relativePath));
+}
+
+function normalizeWhitespace(text) {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
 test('Dockerfile installs opencode-ai 1.2.27 and declares the required env contract', async () => {
-  const dockerfile = await readFile(new URL('../Dockerfile', import.meta.url), 'utf8');
+  const dockerfile = await readText('../Dockerfile');
   assert.match(dockerfile, /opencode-ai@1\.2\.27/);
   assert.match(dockerfile, /OPENCODE_CONFIG=/);
   assert.match(dockerfile, /OCA_OAUTH_CALLBACK_PORT=48801/);
   assert.match(dockerfile, /SUPERPOWERS_SKILLS_DIR=\/opt\/opencode\/skills\b/);
 });
 
-test('config/opencode.json wires both baked plugins and the default model', async () => {
-  const configText = await readFile(new URL('../config/opencode.json', import.meta.url), 'utf8');
-  const config = JSON.parse(configText);
+test('Dockerfile packages the base template, render helper, and Brave MCP metadata', async () => {
+  const dockerfile = await readText('../Dockerfile');
+
+  assert.match(dockerfile, /COPY config\/opencode\.json \/opt\/opencode\/opencode\.base\.json/);
+  assert.match(dockerfile, /COPY scripts\/check-mcp-discovery\.mjs \/opt\/opencode\/scripts\/check-mcp-discovery\.mjs/);
+  assert.match(dockerfile, /COPY scripts\/render-opencode-config\.mjs \/opt\/opencode\/scripts\/render-opencode-config\.mjs/);
+  assert.match(dockerfile, /rm -rf \/var\/lib\/apt\/lists\/\*/);
+  assert.match(dockerfile, /mkdir -p \/opt\/opencode/);
+  assert.match(dockerfile, /npm install -g [^\n]*opencode-ai@1\.2\.27/);
+  assert.match(dockerfile, /npm install -g [^\n]*@modelcontextprotocol\/server-brave-search@latest/);
+  assert.match(dockerfile, /npm ls -g @modelcontextprotocol\/server-brave-search --json --depth=0 > \/opt\/opencode\/mcp-versions\.json/);
+});
+
+test('verify-runtime validates the packaged Brave MCP metadata contract', async () => {
+  const verifyRuntime = await readText('../scripts/verify-runtime.sh');
+
+  assert.match(verifyRuntime, /MCP_VERSIONS_FILE=.*\/opt\/opencode\/mcp-versions\.json/);
+  assert.match(verifyRuntime, /@modelcontextprotocol\/server-brave-search/);
+});
+
+test('config/opencode.json keeps the base OpenCode server and plugin contract', async () => {
+  const config = await readJson('../config/opencode.json');
+
+  assert.equal(config.$schema, 'https://opencode.ai/config.json');
+  assert.equal(config.model, 'oca/gpt-5.4');
+  assert.equal(config.server?.port, 4096);
+  assert.equal(config.server?.hostname, '0.0.0.0');
   assert.deepEqual(config.plugin, [
     'file:///opt/opencode/plugins/opencode-oca-auth',
     'file:///opt/opencode/plugins/superpowers.js',
   ]);
-  assert.equal(config.model, 'oca/gpt-5.4');
+  assert.deepEqual(config.provider?.oca?.models?.['gpt-5.4'], {});
+});
+
+test('config/opencode.json keeps the remote MCP discovery entries enabled', async () => {
+  const config = await readJson('../config/opencode.json');
+
+  assert.deepEqual(config.mcp?.context7, {
+    type: 'remote',
+    url: 'https://mcp.context7.com/mcp',
+    enabled: true,
+  });
+  assert.deepEqual(config.mcp?.grep_app, {
+    type: 'remote',
+    url: 'https://mcp.grep.app',
+    enabled: true,
+  });
+});
+
+test('config/opencode.json keeps Brave MCP local and disabled by default', async () => {
+  const config = await readJson('../config/opencode.json');
+
+  assert.equal(config.mcp?.['brave-search']?.type, 'local');
+  assert.deepEqual(config.mcp?.['brave-search']?.command, ['mcp-server-brave-search']);
+  assert.equal(config.mcp?.['brave-search']?.enabled, false);
 });
 
 test('vendor/sources.lock.json records both upstream repos and pinned revisions', async () => {
-  const lockText = await readFile(new URL('../vendor/sources.lock.json', import.meta.url), 'utf8');
-  const lock = JSON.parse(lockText);
+  const lock = await readJson('../vendor/sources.lock.json');
 
   assert.equal(lock.opencodeOcaAuth.repo, 'https://github.com/Ye99/opencode-oca-auth');
   assert.match(lock.opencodeOcaAuth.revision, /^[0-9a-f]{7,40}$/);
@@ -31,41 +89,69 @@ test('vendor/sources.lock.json records both upstream repos and pinned revisions'
 });
 
 test('Docker build validates vendor sources against sources.lock.json', async () => {
-  const dockerfile = await readFile(new URL('../Dockerfile', import.meta.url), 'utf8');
-  const validator = await readFile(new URL('../scripts/validate-sources-lock.mjs', import.meta.url), 'utf8');
+  const dockerfile = await readText('../Dockerfile');
+  const validator = await readText('../scripts/validate-sources-lock.mjs');
 
   assert.match(dockerfile, /validate-sources-lock\.mjs/);
   assert.match(validator, /sources\.lock\.json/);
   assert.match(validator, /\.source-revision/);
 });
 
-test('README documents the shared image tag and operator flow', async () => {
-  const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
-  const gitignore = await readFile(new URL('../.gitignore', import.meta.url), 'utf8');
-  const dockerignore = await readFile(new URL('../.dockerignore', import.meta.url), 'utf8');
+test('README documents the shared image tag and reusable container run flow', async () => {
+  const readme = await readText('../README.md');
 
   assert.match(readme, /opencode-harness\b/);
   assert.doesNotMatch(readme, /dc-opencode-harness\b/);
   assert.doesNotMatch(readme, /dc-opencode-harness:dev/);
   assert.match(readme, /<host-project-workspace>:\/workspace/);
   assert.doesNotMatch(readme, /docker run --rm -it/);
-  assert.match(readme, /docker run -it \\\n+  --name opencode-harness/);
+  assert.match(readme, /docker run -it/);
+  assert.match(readme, /--name opencode-harness/);
   assert.match(readme, /docker start -ai opencode-harness/);
+});
+
+test('README documents OAuth login and verification commands for operators', async () => {
+  const readme = await readText('../README.md');
+
   assert.match(readme, /docker exec -it opencode-harness opencode auth login/);
-  assert.match(readme, /what skills do you have\? what mcp do you have/);
   assert.match(readme, /http:\/\/127\.0\.0\.1:4096/);
+  assert.match(readme, /docker exec -it opencode-harness opencode debug config/);
+  assert.match(readme, /docker exec -it opencode-harness opencode mcp list/);
+  assert.match(readme, /docker exec -it opencode-harness opencode models oca/);
+  assert.match(readme, /docker exec -it opencode-harness opencode -m oca\/gpt-5\.4 run "/);
+});
+
+test('README documents the optional auth-state backup mount and ignore rules', async () => {
+  const readme = await readText('../README.md');
+  const gitignore = await readText('../.gitignore');
+  const dockerignore = await readText('../.dockerignore');
+  const normalizedReadme = normalizeWhitespace(readme);
+
   assert.match(readme, /mkdir -p \.opencode-state/);
   assert.match(readme, /\.\/\.opencode-state:\/root\/\.local\/share\/opencode/);
-  assert.match(readme, /if you delete the container, you must run `docker exec -it opencode-harness opencode auth login` again unless you reuse the optional `\.\/\.opencode-state` backup mount/i);
+  assert.match(normalizedReadme, /if you delete the container, you must run .*opencode auth login.* again/i);
+  assert.match(normalizedReadme, /unless you reuse the optional `?\.\/\.opencode-state`? backup mount/i);
   assert.match(gitignore, /^\.opencode-state\/$/m);
   assert.match(dockerignore, /^\.opencode-state\/$/m);
 });
 
+test('README documents the Brave env workflow and disabled-by-default fallback', async () => {
+  const readme = await readText('../README.md');
+  const normalizedReadme = normalizeWhitespace(readme);
+
+  assert.match(readme, /docker run -it/);
+  assert.match(readme, /-e BRAVE_API_KEY/);
+  assert.match(normalizedReadme, /obtain a Brave Search API key/i);
+  assert.match(readme, /export BRAVE_API_KEY=/);
+  assert.match(normalizedReadme, /if `?BRAVE_API_KEY`? is unset, the container still starts/i);
+  assert.match(normalizedReadme, /`?brave-search`? disabled/i);
+});
+
 test('vendor trees include both pinned upstream source snapshots', async () => {
-  const authPkg = JSON.parse(await readFile(new URL('../vendor/opencode-oca-auth/package.json', import.meta.url), 'utf8'));
-  const superpowersPkg = JSON.parse(await readFile(new URL('../vendor/superpowers/package.json', import.meta.url), 'utf8'));
-  const authRevision = await readFile(new URL('../vendor/opencode-oca-auth/.source-revision', import.meta.url), 'utf8');
-  const superpowersRevision = await readFile(new URL('../vendor/superpowers/.source-revision', import.meta.url), 'utf8');
+  const authPkg = await readJson('../vendor/opencode-oca-auth/package.json');
+  const superpowersPkg = await readJson('../vendor/superpowers/package.json');
+  const authRevision = await readText('../vendor/opencode-oca-auth/.source-revision');
+  const superpowersRevision = await readText('../vendor/superpowers/.source-revision');
 
   assert.equal(authPkg.name, 'opencode-oca-auth');
   assert.equal(superpowersPkg.name, 'superpowers');
@@ -75,6 +161,105 @@ test('vendor trees include both pinned upstream source snapshots', async () => {
 });
 
 test('entrypoint invokes the packaged verify-runtime script from the image path', async () => {
-  const entrypoint = await readFile(new URL('../scripts/opencode-harness-entrypoint', import.meta.url), 'utf8');
+  const entrypoint = await readText('../scripts/opencode-harness-entrypoint');
   assert.match(entrypoint, /\/opt\/opencode\/scripts\/verify-runtime\.sh/);
+});
+
+test('entrypoint renders the live config before preflight and then starts opencode web', async () => {
+  const entrypoint = await readText('../scripts/opencode-harness-entrypoint');
+  const mkdirIndex = entrypoint.indexOf('mkdir -p "$(dirname "$OPENCODE_CONFIG")"');
+  const renderIndex = entrypoint.indexOf('node "/opt/opencode/scripts/render-opencode-config.mjs" "/opt/opencode/opencode.base.json" "$OPENCODE_CONFIG"');
+  const preflightIndex = entrypoint.indexOf('bash "/opt/opencode/scripts/verify-runtime.sh" preflight');
+  const startupIndex = entrypoint.indexOf('exec opencode web --hostname "$OPENCODE_SERVER_HOST" --port "$OPENCODE_SERVER_PORT"');
+
+  assert.match(entrypoint, /mkdir -p "\$\(dirname "\$OPENCODE_CONFIG"\)"/);
+  assert.match(entrypoint, /node "\/opt\/opencode\/scripts\/render-opencode-config\.mjs" "\/opt\/opencode\/opencode\.base\.json" "\$OPENCODE_CONFIG"/);
+  assert.notEqual(mkdirIndex, -1);
+  assert.notEqual(renderIndex, -1);
+  assert.notEqual(preflightIndex, -1);
+  assert.notEqual(startupIndex, -1);
+  assert.ok(mkdirIndex < renderIndex);
+  assert.ok(renderIndex < preflightIndex);
+  assert.ok(preflightIndex < startupIndex);
+});
+
+test('smoke-mcp-runtime rebuilds the image and cleans up test containers', async () => {
+  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+
+  assert.match(smokeScript, /BRAVE_API_KEY_DUMMY=/);
+  assert.match(smokeScript, /docker build --pull --no-cache -t "\$IMAGE_TAG" \./);
+  assert.match(smokeScript, /--network none/);
+  assert.match(smokeScript, /trap\s+['"].*cleanup/);
+  assert.match(smokeScript, /docker rm -f/);
+});
+
+test('smoke-mcp-runtime checks the packaged Brave MCP binary and metadata version', async () => {
+  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+
+  assert.match(smokeScript, /command -v mcp-server-brave-search/);
+  assert.match(smokeScript, /npm ls -g @modelcontextprotocol\/server-brave-search --depth=0/);
+  assert.match(smokeScript, /mcp-versions\.json/);
+  assert.match(smokeScript, /Brave MCP version mismatch:/);
+});
+
+test('smoke-mcp-runtime verifies rendered Brave state against discovered MCP output', async () => {
+  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+
+  assert.match(smokeScript, /opencode mcp list/);
+  assert.match(smokeScript, /check-mcp-discovery\.mjs/);
+  assert.match(smokeScript, /--require-enabled context7/);
+  assert.match(smokeScript, /--require-enabled grep_app/);
+  assert.match(smokeScript, /--require-missing-or-disabled brave-search/);
+  assert.match(smokeScript, /--require-enabled brave-search/);
+  assert.match(smokeScript, /Rendered brave-search enabled\/key mismatch:/);
+  assert.match(smokeScript, /Rendered brave-search state mismatch:/);
+});
+
+test('smoke-mcp-runtime validates the packaged startup path instead of overriding the entrypoint', async () => {
+  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+
+  assert.doesNotMatch(smokeScript, /--entrypoint bash/);
+  assert.match(smokeScript, /docker inspect -f '\{\{\.State.Status\}\}'/);
+  assert.match(smokeScript, /docker logs/);
+  assert.match(smokeScript, /exec_checks/);
+});
+
+test('smoke-mcp-runtime starts Brave with only the API key in a clean env', async () => {
+  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+  const envLine = smokeScript.match(/env -i[^\n]*/)?.[0];
+
+  assert.ok(envLine, 'expected smoke script to launch Brave via env -i');
+  assert.match(envLine, /BRAVE_API_KEY="\$BRAVE_API_KEY"/);
+  const passedThroughEnvNames = [...envLine.matchAll(/\b([A-Z_][A-Z0-9_]*)=/g)].map(([, name]) => name);
+  assert.deepEqual(passedThroughEnvNames, ['BRAVE_API_KEY']);
+  assert.doesNotMatch(smokeScript, /env -i [^\n]*(PATH|HOME)=/);
+});
+
+test('smoke-mcp-runtime accepts either a timeout hold-open or a Brave startup banner', async () => {
+  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+
+  assert.match(smokeScript, /Brave Search MCP Server running on stdio/);
+  assert.match(smokeScript, /if \[\[ "\$status" -ne 124 \]\] && ! grep -Fq 'Brave Search MCP Server running on stdio' \/tmp\/brave-startup\.txt; then/);
+});
+
+test('smoke-mcp-runtime always validates remote MCP discovery, independent of smoke state names', async () => {
+  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+
+  assert.match(smokeScript, /--require-enabled context7/);
+  assert.match(smokeScript, /--require-enabled grep_app/);
+  assert.doesNotMatch(smokeScript, /REMOTE_DISCOVERY_EXPECTED=/);
+  assert.doesNotMatch(smokeScript, /SMOKE_STATE_NAME" == \*-online/);
+});
+
+test('smoke-mcp-runtime exercises keyed and no-key Brave states with and without egress', async () => {
+  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+
+  for (const invocation of [
+    'run_state keyed-online bridge true',
+    'run_state no-key-online bridge false',
+    'run_state keyed-no-egress none true',
+    'run_state no-key-no-egress none false',
+  ]) {
+    assert.match(smokeScript, new RegExp(invocation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
 });

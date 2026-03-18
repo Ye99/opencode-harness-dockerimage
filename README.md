@@ -19,8 +19,11 @@ docker build -f Dockerfile -t opencode-harness .
 ## Run
 
 ```bash
+export BRAVE_API_KEY=your-brave-search-api-key
+
 docker run -it \
   --name opencode-harness \
+  -e BRAVE_API_KEY \
   -p 127.0.0.1:4096:4096 \
   -p 127.0.0.1:48801:48801 \
   -v "<host-project-workspace>:/workspace" \
@@ -28,6 +31,8 @@ docker run -it \
 ```
 
 Replace `<host-project-workspace>` with the writable host path of the project you want OpenCode to operate on.
+
+Obtain a Brave Search API key first, then export `BRAVE_API_KEY` in the shell that launches `docker run`. If `BRAVE_API_KEY` is unset, the container still starts and the rendered config keeps `brave-search` disabled.
 
 If you `docker stop opencode-harness` and later `docker start -ai opencode-harness`, the same container keeps its auth state, so you do not need to log in again.
 
@@ -79,6 +84,7 @@ Web UI:
 ```bash
 curl http://127.0.0.1:4096/global/health
 docker exec -it opencode-harness opencode debug config
+docker exec -it opencode-harness opencode mcp list
 docker exec -it opencode-harness opencode models oca
 docker exec -it opencode-harness opencode -m oca/gpt-5.4 run "what skills do you have? what mcp do you have"
 ```

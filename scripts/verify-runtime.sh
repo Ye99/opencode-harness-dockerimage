@@ -2,10 +2,12 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 COMMAND="${1:-preflight}"
 WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
 OPENCODE_CONFIG="${OPENCODE_CONFIG:-/opt/opencode/opencode.json}"
 OPENCODE_CONFIG_DIR="${OPENCODE_CONFIG_DIR:-/opt/opencode}"
+MCP_VERSIONS_FILE="${MCP_VERSIONS_FILE:-/opt/opencode/mcp-versions.json}"
 OPENCODE_SERVER_PORT="${OPENCODE_SERVER_PORT:-4096}"
 OPENCODE_SERVER_HOST="${OPENCODE_SERVER_HOST:-0.0.0.0}"
 OCA_OAUTH_CALLBACK_PORT="${OCA_OAUTH_CALLBACK_PORT:-48801}"
@@ -13,6 +15,8 @@ SUPERPOWERS_SKILLS_DIR="${SUPERPOWERS_SKILLS_DIR:-/opt/opencode/skills}"
 SUPERPOWERS_INSTALL_DIR="$SUPERPOWERS_SKILLS_DIR/superpowers"
 OCA_PLUGIN_DIR="${OCA_PLUGIN_DIR:-$OPENCODE_CONFIG_DIR/plugins/opencode-oca-auth}"
 SUPERPOWERS_PLUGIN="${SUPERPOWERS_PLUGIN:-$OPENCODE_CONFIG_DIR/plugins/superpowers.js}"
+BRAVE_MCP_BINARY="mcp-server-brave-search"
+BRAVE_MCP_PACKAGE="@modelcontextprotocol/server-brave-search"
 
 fail() {
   printf '%s\n' "$1" >&2
@@ -45,6 +49,15 @@ check_assets() {
   [[ -d "$SUPERPOWERS_INSTALL_DIR/using-superpowers" ]] || fail "Missing bundled Superpowers skills: $SUPERPOWERS_SKILLS_DIR"
   [[ -d "$SUPERPOWERS_INSTALL_DIR/brainstorming" ]] || fail "Missing bundled Superpowers skills: $SUPERPOWERS_SKILLS_DIR"
   command -v opencode >/dev/null 2>&1 || fail "opencode CLI not found in PATH"
+  command -v "$BRAVE_MCP_BINARY" >/dev/null 2>&1 || fail "$BRAVE_MCP_BINARY not found in PATH"
+  [[ -f "$MCP_VERSIONS_FILE" ]] || fail "Missing MCP metadata file: $MCP_VERSIONS_FILE"
+  node -e '
+    const fs = require("node:fs");
+    const [filePath, packageName] = process.argv.slice(1);
+    const metadata = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const version = metadata?.dependencies?.[packageName]?.version;
+    process.exit(typeof version === "string" && version.length > 0 ? 0 : 1);
+  ' "$MCP_VERSIONS_FILE" "$BRAVE_MCP_PACKAGE" || fail "Missing Brave MCP version metadata: $MCP_VERSIONS_FILE"
 }
 
 check_config_visibility() {
@@ -61,6 +74,38 @@ check_oca_models() {
   grep -q 'oca/' <<<"$output" || fail 'OpenCode does not expose OCA models from the baked auth plugin'
 }
 
+rendered_brave_enabled() {
+  local state
+
+  state="$(node -e '
+    const fs = require("node:fs");
+    const [configPath] = process.argv.slice(1);
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    process.stdout.write(config?.mcp?.["brave-search"]?.enabled === true ? "enabled" : "disabled");
+  ' "$OPENCODE_CONFIG")" || fail "OpenCode config is unreadable or malformed: $OPENCODE_CONFIG"
+
+  [[ "$state" == 'enabled' ]]
+}
+
+check_mcp_discovery() {
+  local output
+  local helper_output
+  local -a helper_args=(
+    --require-enabled context7
+    --require-enabled grep_app
+  )
+
+  output="$(opencode mcp list 2>&1)" || fail "opencode mcp list failed: $output"
+
+  if rendered_brave_enabled; then
+    helper_args+=(--require-enabled brave-search)
+  else
+    helper_args+=(--require-missing-or-disabled brave-search)
+  fi
+
+  helper_output="$(printf '%s' "$output" | node "$SCRIPT_DIR/check-mcp-discovery.mjs" "${helper_args[@]}" 2>&1)" || fail "$helper_output"
+}
+
 case "$COMMAND" in
   preflight)
     check_workspace
@@ -69,6 +114,7 @@ case "$COMMAND" in
     check_port_available '0.0.0.0' "$OCA_OAUTH_CALLBACK_PORT"
     check_config_visibility
     check_oca_models
+    check_mcp_discovery
     printf 'preflight-ok\n'
     ;;
   *)

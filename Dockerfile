@@ -13,14 +13,18 @@ ENV OPENCODE_CONFIG=/opt/opencode/opencode.json \
 RUN apt-get update \
   && apt-get install -y --no-install-recommends bash ca-certificates curl git \
   && rm -rf /var/lib/apt/lists/* \
-  && npm install -g opencode-ai@1.2.27
+  && mkdir -p /opt/opencode \
+  && npm install -g opencode-ai@1.2.27 @modelcontextprotocol/server-brave-search@latest \
+  && npm ls -g @modelcontextprotocol/server-brave-search --json --depth=0 > /opt/opencode/mcp-versions.json
 
 WORKDIR /opt/opencode
 
-COPY config/opencode.json /opt/opencode/opencode.json
+COPY config/opencode.json /opt/opencode/opencode.base.json
 COPY scripts/opencode-harness-entrypoint /usr/local/bin/opencode-harness-entrypoint
 COPY scripts/install-superpowers.sh /opt/opencode/scripts/install-superpowers.sh
 COPY scripts/patch-upstream-sources.mjs /opt/opencode/scripts/patch-upstream-sources.mjs
+COPY scripts/check-mcp-discovery.mjs /opt/opencode/scripts/check-mcp-discovery.mjs
+COPY scripts/render-opencode-config.mjs /opt/opencode/scripts/render-opencode-config.mjs
 COPY scripts/validate-sources-lock.mjs /opt/opencode/scripts/validate-sources-lock.mjs
 COPY scripts/verify-runtime.sh /opt/opencode/scripts/verify-runtime.sh
 COPY vendor/sources.lock.json /opt/opencode/vendor/sources.lock.json
