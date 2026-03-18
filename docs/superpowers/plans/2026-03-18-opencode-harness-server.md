@@ -45,7 +45,7 @@ Expected: FAIL because the scripts and fixtures do not exist yet
 
 ```json
 {
-  "name": "dc-opencode-harness",
+  "name": "opencode-harness",
   "private": true,
   "type": "module",
   "scripts": {
@@ -192,7 +192,7 @@ ENTRYPOINT ["/usr/local/bin/opencode-harness-entrypoint"]
 
 - [ ] **Step 4: Run tests and Docker smoke checks**
 
-Run: `npm test && docker build -f Dockerfile -t dc-opencode-harness .`
+Run: `npm test && docker build -f Dockerfile -t opencode-harness .`
 Expected: tests PASS and Docker build exits 0
 
 ## Chunk 4: End-To-End Verification
@@ -205,17 +205,17 @@ Expected: tests PASS and Docker build exits 0
 
 - [ ] **Step 1: Start the built image with a writable temp workspace**
 
-Run: `docker run --rm -d --name dc-opencode-harness-smoke -p 127.0.0.1:4096:4096 -p 127.0.0.1:48801:48801 -v "$(pwd):/workspace" dc-opencode-harness`
+Run: `docker run --rm -d --name opencode-harness-smoke -p 127.0.0.1:4096:4096 -p 127.0.0.1:48801:48801 -v "$(pwd):/workspace" opencode-harness`
 Expected: container starts successfully
 
 - [ ] **Step 2: Verify runtime health and config**
 
-Run: `curl http://127.0.0.1:4096/global/health && docker exec dc-opencode-harness-smoke opencode debug config && docker exec dc-opencode-harness-smoke opencode models oca`
+Run: `curl http://127.0.0.1:4096/global/health && docker exec opencode-harness-smoke opencode debug config && docker exec opencode-harness-smoke opencode models oca`
 Expected: health endpoint responds, config shows the baked plugin paths, and OCA models are visible
 
 - [ ] **Step 3: Verify operator access flow is documented and runnable**
 
-Run: `docker exec -it dc-opencode-harness-smoke opencode auth login`
+Run: `docker exec -it opencode-harness-smoke opencode auth login`
 Expected: login flow starts, shows the `oca` provider, and documents the public redirect target `http://127.0.0.1:48801/auth/oca`
 
 - [ ] **Step 4: Verify TUI attach, Web UI access, and default model smoke command are documented**
@@ -225,5 +225,5 @@ Expected: the README and PDD document the TUI attach command, the Web UI URL `ht
 
 - [ ] **Step 5: Stop the smoke container**
 
-Run: `docker stop dc-opencode-harness-smoke`
+Run: `docker stop opencode-harness-smoke`
 Expected: container exits cleanly

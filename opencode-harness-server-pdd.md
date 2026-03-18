@@ -27,7 +27,7 @@ Engineers need a packaged, ready-to-use OpenCode environment where they can:
 | Separate harness image from the target project's own Dockerfile/build setup | Different product boundaries - this is OpenCode runtime, not the mounted project's runtime image |
 | Thin entrypoint script with preflight checks | Fail fast on missing mounts, verify bundled dependencies, then `exec` OpenCode for correct signal handling |
 | Reuse native OpenCode session/message/history flow | No harness-owned queue layer - keeps built-in Web UI and TUI attached directly to the headless instance |
-| Use one image tag `dc-opencode-harness` for both coding and code review | Same runtime contract serves both workflows; no separate `:dev` image split |
+| Use one image tag `opencode-harness` for both coding and code review | Same runtime contract serves both workflows; no separate `:dev` image split |
 
 ### Ports and OAuth
 
@@ -166,23 +166,24 @@ ENTRYPOINT ["/usr/local/bin/opencode-harness-entrypoint"]
 ### Build
 
 ```bash
-docker build -f Dockerfile -t dc-opencode-harness .
+docker build -f Dockerfile -t opencode-harness .
 ```
 
 ### Run
 
 ```bash
 docker run --rm -it \
+  --name opencode-harness \
   -p 127.0.0.1:4096:4096 \
   -p 127.0.0.1:48801:48801 \
   -v "<host-project-workspace>:/workspace" \
-  dc-opencode-harness
+  opencode-harness
 ```
 
 Replace `<host-project-workspace>` with the host path of the project you want OpenCode to operate on.
 
 ### OAuth Login
-1. Start login from the running container shell, for example: `docker exec -it <container-name> opencode auth login`
+1. Start login from the running container shell, for example: `docker exec -it opencode-harness opencode auth login`
 2. Choose `oca` provider
 3. On host, the engineer opens the given URL in a browser and completes the OAuth flow.
 4. Browser redirects to `http://127.0.0.1:48801/auth/oca`
@@ -198,7 +199,7 @@ Open `http://127.0.0.1:4096` in browser on same host.
 ### Verify Environment
 ```bash
 curl http://127.0.0.1:4096/global/health
-opencode debug config
-opencode models oca
-opencode -m oca/gpt-5.4 run "Reply with: ok"
+docker exec -it opencode-harness opencode debug config
+docker exec -it opencode-harness opencode models oca
+docker exec -it opencode-harness opencode -m oca/gpt-5.4 run "what skills do you have? what mcp do you have"
 ```

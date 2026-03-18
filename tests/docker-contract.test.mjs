@@ -42,10 +42,13 @@ test('Docker build validates vendor sources against sources.lock.json', async ()
 test('README documents the shared image tag and operator flow', async () => {
   const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 
-  assert.match(readme, /dc-opencode-harness\b/);
+  assert.match(readme, /opencode-harness\b/);
+  assert.doesNotMatch(readme, /dc-opencode-harness\b/);
   assert.doesNotMatch(readme, /dc-opencode-harness:dev/);
   assert.match(readme, /<host-project-workspace>:\/workspace/);
-  assert.match(readme, /docker exec -it <container-name> opencode auth login/);
+  assert.match(readme, /docker run --rm -it \\\n  --name opencode-harness/);
+  assert.match(readme, /docker exec -it opencode-harness opencode auth login/);
+  assert.match(readme, /what skills do you have\? what mcp do you have/);
   assert.match(readme, /http:\/\/127\.0\.0\.1:4096/);
 });
 

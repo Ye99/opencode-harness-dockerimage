@@ -8,22 +8,23 @@ Build a single Docker image that packages OpenCode for both coding and code revi
 - OCA OAuth callback binding on `0.0.0.0:48801`
 - baked `opencode-oca-auth` and `superpowers` assets from pinned upstream revisions
 - a mounted target project workspace at `/workspace`
-- one shared image tag: `dc-opencode-harness`
+- one shared image tag: `opencode-harness`
 
 ## Build
 
 ```bash
-docker build -f Dockerfile -t dc-opencode-harness .
+docker build -f Dockerfile -t opencode-harness .
 ```
 
 ## Run
 
 ```bash
 docker run --rm -it \
+  --name opencode-harness \
   -p 127.0.0.1:4096:4096 \
   -p 127.0.0.1:48801:48801 \
   -v "<host-project-workspace>:/workspace" \
-  dc-opencode-harness
+  opencode-harness
 ```
 
 Replace `<host-project-workspace>` with the writable host path of the project you want OpenCode to operate on.
@@ -32,7 +33,7 @@ Replace `<host-project-workspace>` with the writable host path of the project yo
 
 Start login from the running container shell:
 
-`docker exec -it <container-name> opencode auth login`
+`docker exec -it opencode-harness opencode auth login`
 
 Then:
 
@@ -57,9 +58,9 @@ Web UI:
 
 ```bash
 curl http://127.0.0.1:4096/global/health
-docker exec -it <container-name> opencode debug config
-docker exec -it <container-name> opencode models oca
-docker exec -it <container-name> opencode -m oca/gpt-5.4 run "Reply with: ok"
+docker exec -it opencode-harness opencode debug config
+docker exec -it opencode-harness opencode models oca
+docker exec -it opencode-harness opencode -m oca/gpt-5.4 run "what skills do you have? what mcp do you have"
 ```
 
 ## Reproducibility
