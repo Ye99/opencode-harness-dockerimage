@@ -62,8 +62,40 @@ exec_checks() {
 set -euo pipefail
 
 command -v mcp-server-brave-search >/dev/null
+command -v python3 >/dev/null
+command -v python >/dev/null
+command -v pip3 >/dev/null
+command -v pip >/dev/null
 npm ls -g @modelcontextprotocol/server-brave-search --depth=0 >/tmp/brave-package.txt
 test -f /opt/opencode/mcp-versions.json
+test -f /opt/opencode/python-version.txt
+resolved_python_version="$(tr -d '\n' </opt/opencode/python-version.txt)"
+venv_root="$(mktemp -d)"
+trap 'rm -rf "$venv_root"' EXIT
+python3 --version >/tmp/python3-version.txt
+python --version >/tmp/python-version.txt
+pip3 --version >/tmp/pip3-version.txt
+pip --version >/tmp/pip-version.txt
+python3 -m pip --version >/tmp/python3-m-pip-version.txt
+python -m pip --version >/tmp/python-m-pip-version.txt
+python3 -m venv "$venv_root/python3-venv"
+python -m venv "$venv_root/python-venv"
+
+python3 - <<'PY' "$resolved_python_version"
+import sys
+
+resolved_version = sys.argv[1]
+assert sys.version.startswith(resolved_version), (resolved_version, sys.version)
+assert sys.executable
+PY
+
+python - <<'PY' "$resolved_python_version"
+import sys
+
+resolved_version = sys.argv[1]
+assert sys.version.startswith(resolved_version), (resolved_version, sys.version)
+assert sys.executable
+PY
 
 node - <<'NODE'
 const fs = require('node:fs');

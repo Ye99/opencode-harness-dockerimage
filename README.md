@@ -16,6 +16,18 @@ Build a single Docker image that packages OpenCode for both coding and code revi
 docker build -f Dockerfile -t opencode-harness .
 ```
 
+Default `PYTHON_VERSION` is `latest-stable`.
+
+Override it explicitly when needed:
+
+```bash
+docker build -f Dockerfile -t opencode-harness --build-arg PYTHON_VERSION=3.14.3 .
+```
+
+The image includes `python`, `python3`, `pip`, `pip3`, and `python -m venv` support.
+
+Builds resolve and download Python from `python.org`.
+
 ## Run
 
 ```bash
@@ -44,7 +56,7 @@ If you want auth to survive deleting and recreating the container, create a loca
 mkdir -p .opencode-state
 ```
 
-Then add this extra mount to the `docker run` command:
+Insert this extra `-v` line into `docker run` before the final `opencode-harness` image name, next to the existing `/workspace` mount:
 
 ```bash
 -v "./.opencode-state:/root/.local/share/opencode"
@@ -54,7 +66,7 @@ The local `./.opencode-state/` directory is gitignored and dockerignored so auth
 
 ## OAuth login
 
-Start login from the running container shell:
+From the host, start login against the running container:
 
 `docker exec -it opencode-harness opencode auth login`
 
@@ -88,6 +100,8 @@ docker exec -it opencode-harness opencode mcp list
 docker exec -it opencode-harness opencode models oca
 docker exec -it opencode-harness opencode -m oca/gpt-5.4 run "what skills do you have? what mcp do you have"
 ```
+
+Healthy state: the health check returns `200`, `debug config` renders without startup errors, `mcp list` and `models oca` return entries, and the final `run` command returns a model response.
 
 ## Reproducibility
 

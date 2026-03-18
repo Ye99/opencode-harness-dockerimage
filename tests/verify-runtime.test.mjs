@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chmod, copyFile, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -21,7 +21,101 @@ function run(command, args, options = {}) {
   });
 }
 
-async function makeRuntimeFixture() {
+async function writeExecutable(filePath, contents) {
+  await writeFile(filePath, contents, 'utf8');
+  await chmod(filePath, 0o755);
+}
+
+async function writeHostCommandLink(targetDir, name, targetPath) {
+  await symlink(targetPath, path.join(targetDir, name));
+}
+
+async function writePythonRuntimeCommands(binDir, options = {}) {
+  const {
+    python3 = true,
+    python = true,
+    pip3 = true,
+    pip = true,
+    python3VenvSucceeds = true,
+  } = options;
+
+  if (python3) {
+    await writeExecutable(
+      path.join(binDir, 'python3'),
+      `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${1:-}" == "--version" ]]; then
+  printf 'Python 3.12.9\n'
+  exit 0
+fi
+if [[ "\${1:-}" == "-m" && "\${2:-}" == "venv" ]]; then
+  if [[ "\${3:-}" == "" ]]; then
+    printf 'missing venv target\n' >&2
+    exit 1
+  fi
+  ${python3VenvSucceeds ? "mkdir -p \"\\$3\"\n  exit 0" : "printf 'venv failed\\n' >&2\n  exit 1"}
+fi
+printf 'python3 stub does not support: %s\n' "\$*" >&2
+exit 1
+`,
+    );
+  }
+
+  if (python) {
+    await writeExecutable(
+      path.join(binDir, 'python'),
+      `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${1:-}" == "--version" ]]; then
+  printf 'Python 3.12.9\n'
+  exit 0
+fi
+printf 'python stub does not support: %s\n' "\$*" >&2
+exit 1
+`,
+    );
+  }
+
+  if (pip3) {
+    await writeExecutable(
+      path.join(binDir, 'pip3'),
+      `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${1:-}" == "--version" ]]; then
+  printf 'pip 24.0 from /tmp/pip3 (python 3.12)\n'
+  exit 0
+fi
+printf 'pip3 stub does not support: %s\n' "\$*" >&2
+exit 1
+`,
+    );
+  }
+
+  if (pip) {
+    await writeExecutable(
+      path.join(binDir, 'pip'),
+      `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${1:-}" == "--version" ]]; then
+  printf 'pip 24.0 from /tmp/pip (python 3.12)\n'
+  exit 0
+fi
+printf 'pip stub does not support: %s\n' "\$*" >&2
+exit 1
+`,
+    );
+  }
+}
+
+async function makeRuntimeFixture(options = {}) {
+  const {
+    python3 = true,
+    python = true,
+    pip3 = true,
+    pip = true,
+    python3VenvSucceeds = true,
+    pythonVersion = '3.12.9',
+  } = options;
   const root = await mkdtemp(path.join(tmpdir(), 'verify-runtime-'));
   const workspace = path.join(root, 'workspace');
   const configDir = path.join(root, 'opt/opencode');
@@ -29,6 +123,7 @@ async function makeRuntimeFixture() {
   const skillsRoot = path.join(configDir, 'skills');
   const skillsDir = path.join(skillsRoot, 'superpowers');
   const binDir = path.join(root, 'bin');
+  const hostBinDir = path.join(root, 'host-bin');
   const metadataPath = path.join(configDir, 'mcp-versions.json');
 
   await mkdir(workspace, { recursive: true });
@@ -37,6 +132,26 @@ async function makeRuntimeFixture() {
   await mkdir(path.join(skillsDir, 'using-superpowers'), { recursive: true });
   await mkdir(path.join(skillsDir, 'brainstorming'), { recursive: true });
   await mkdir(binDir, { recursive: true });
+  await mkdir(hostBinDir, { recursive: true });
+
+  await Promise.all([
+    writeHostCommandLink(hostBinDir, 'bash', '/bin/bash'),
+    writeHostCommandLink(hostBinDir, 'cat', '/bin/cat'),
+    writeHostCommandLink(hostBinDir, 'mkdir', '/bin/mkdir'),
+    writeHostCommandLink(hostBinDir, 'rm', '/bin/rm'),
+    writeHostCommandLink(hostBinDir, 'dirname', '/usr/bin/dirname'),
+    writeHostCommandLink(hostBinDir, 'grep', '/usr/bin/grep'),
+    writeHostCommandLink(hostBinDir, 'mktemp', '/usr/bin/mktemp'),
+    writeHostCommandLink(hostBinDir, 'node', process.execPath),
+  ]);
+
+  await writePythonRuntimeCommands(binDir, {
+    python3,
+    python,
+    pip3,
+    pip,
+    python3VenvSucceeds,
+  });
 
   await writeFile(
     path.join(configDir, 'opencode.json'),
@@ -55,6 +170,7 @@ async function makeRuntimeFixture() {
   await writeFile(path.join(configDir, 'plugins/superpowers.js'), 'export default {}\n');
   await writeFile(path.join(skillsDir, 'using-superpowers/SKILL.md'), '# using-superpowers\n');
   await writeFile(path.join(skillsDir, 'brainstorming/SKILL.md'), '# brainstorming\n');
+  await writeFile(path.join(configDir, 'python-version.txt'), `${pythonVersion}\n`, 'utf8');
   await writeFile(
     metadataPath,
     JSON.stringify(
@@ -108,14 +224,23 @@ exit 0
     'utf8',
   );
   await chmod(path.join(binDir, 'opencode'), 0o755);
-  await writeFile(
+  await writeExecutable(
     path.join(binDir, 'mcp-server-brave-search'),
     '#!/usr/bin/env bash\nprintf \'brave-search\\n\'\n',
-    'utf8',
   );
-  await chmod(path.join(binDir, 'mcp-server-brave-search'), 0o755);
 
-  return { root, workspace, configDir, pluginDir, skillsRoot, skillsDir, binDir, metadataPath };
+  return {
+    root,
+    workspace,
+    configDir,
+    pluginDir,
+    skillsRoot,
+    skillsDir,
+    binDir,
+    hostBinDir,
+    metadataPath,
+    pathEnv: `${binDir}:${hostBinDir}`,
+  };
 }
 
 async function setRenderedBraveEnabled(fixture, enabled) {
@@ -149,7 +274,7 @@ async function runPreflight(fixture, env = {}) {
       OPENCODE_CONFIG_DIR: fixture.configDir,
       SUPERPOWERS_SKILLS_DIR: fixture.skillsRoot,
       MCP_VERSIONS_FILE: fixture.metadataPath,
-      PATH: `${fixture.binDir}:${process.env.PATH}`,
+      PATH: fixture.pathEnv,
       ...env,
     },
   });
@@ -213,6 +338,46 @@ const ansiFormattedEnabledMcpListOutput = `\u001b[0m
 `;
 
 test('verify-runtime preflight succeeds with exact context7, grep_app, and brave-search entries', async () => {
+  const fixture = await makeRuntimeFixture();
+  const result = await runPreflight(fixture, {
+    OPENCODE_MCP_LIST_STDOUT: 'context7 connected\ngrep_app available\nbrave-search ready\n',
+  });
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /preflight-ok/);
+});
+
+test('verify-runtime preflight fails when python3 is missing', async () => {
+  const fixture = await makeRuntimeFixture({ python3: false });
+  const result = await runPreflight(fixture, {
+    OPENCODE_MCP_LIST_STDOUT: 'context7 connected\ngrep_app available\nbrave-search ready\n',
+  });
+
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /python3.*PATH/i);
+});
+
+test('verify-runtime preflight fails when pip3 is missing', async () => {
+  const fixture = await makeRuntimeFixture({ pip3: false });
+  const result = await runPreflight(fixture, {
+    OPENCODE_MCP_LIST_STDOUT: 'context7 connected\ngrep_app available\nbrave-search ready\n',
+  });
+
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /pip3.*PATH/i);
+});
+
+test('verify-runtime preflight fails when python3 venv creation fails', async () => {
+  const fixture = await makeRuntimeFixture({ python3VenvSucceeds: false });
+  const result = await runPreflight(fixture, {
+    OPENCODE_MCP_LIST_STDOUT: 'context7 connected\ngrep_app available\nbrave-search ready\n',
+  });
+
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /python3 -m venv/i);
+});
+
+test('verify-runtime preflight succeeds when Python runtime commands exist and venv succeeds', async () => {
   const fixture = await makeRuntimeFixture();
   const result = await runPreflight(fixture, {
     OPENCODE_MCP_LIST_STDOUT: 'context7 connected\ngrep_app available\nbrave-search ready\n',

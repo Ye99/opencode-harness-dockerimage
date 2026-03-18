@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 
 async function readText(relativePath) {
   return readFile(new URL(relativePath, import.meta.url), 'utf8');
@@ -8,6 +8,15 @@ async function readText(relativePath) {
 
 async function readJson(relativePath) {
   return JSON.parse(await readText(relativePath));
+}
+
+async function pathExists(relativePath) {
+  try {
+    await access(new URL(relativePath, import.meta.url));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function normalizeWhitespace(text) {
@@ -246,6 +255,30 @@ test('smoke-mcp-runtime accepts either a timeout hold-open or a Brave startup ba
   assert.match(smokeScript, /if \[\[ "\$status" -ne 124 \]\] && ! grep -Fq 'Brave Search MCP Server running on stdio' \/tmp\/brave-startup\.txt; then/);
 });
 
+test('smoke-mcp-runtime verifies the packaged Python runtime commands and resolved version marker', async () => {
+  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+
+  assert.match(smokeScript, /command -v python3 >\/dev\/null/);
+  assert.match(smokeScript, /command -v python >\/dev\/null/);
+  assert.match(smokeScript, /command -v pip3 >\/dev\/null/);
+  assert.match(smokeScript, /command -v pip >\/dev\/null/);
+  assert.match(smokeScript, /test -f \/opt\/opencode\/python-version\.txt/);
+  assert.match(smokeScript, /resolved_python_version="\$\(tr -d '\\n' <\/opt\/opencode\/python-version\.txt\)"/);
+  assert.match(smokeScript, /python3 --version >/);
+  assert.match(smokeScript, /python --version >/);
+  assert.match(smokeScript, /pip3 --version >/);
+  assert.match(smokeScript, /pip --version >/);
+  assert.match(smokeScript, /python3 - <<'PY'/);
+  assert.match(smokeScript, /python - <<'PY'/);
+  assert.match(smokeScript, /python3 -m pip --version >/);
+  assert.match(smokeScript, /python -m pip --version >/);
+  assert.match(smokeScript, /mktemp -d/);
+  assert.match(smokeScript, /python3 -m venv "\$venv_root\/python3-venv"/);
+  assert.match(smokeScript, /python -m venv "\$venv_root\/python-venv"/);
+  assert.match(smokeScript, /sys\.version\.startswith\(resolved_version\)/);
+  assert.match(smokeScript, /sys\.executable/);
+});
+
 test('smoke-mcp-runtime always validates remote MCP discovery, independent of smoke state names', async () => {
   const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
 
@@ -266,4 +299,38 @@ test('smoke-mcp-runtime exercises keyed and no-key Brave states with and without
   ]) {
     assert.match(smokeScript, new RegExp(invocation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+});
+
+test('Dockerfile builds Python in dedicated resolver and builder stages, then ships only the runtime contract', async () => {
+  const dockerfile = await readText('../Dockerfile');
+
+  assert.match(dockerfile, /^ARG PYTHON_VERSION=latest-stable$/m);
+  assert.match(dockerfile, /^FROM node:22-slim AS python-version-resolver$/m);
+  assert.match(dockerfile, /^FROM node:22-slim AS python-builder$/m);
+  assert.match(dockerfile, /^FROM node:22-slim$/m);
+  assert.match(dockerfile, /COPY scripts\/resolve-python-version\.mjs \/opt\/opencode\/scripts\/resolve-python-version\.mjs/);
+  assert.match(dockerfile, /COPY scripts\/install-python-runtime\.sh \/opt\/opencode\/scripts\/install-python-runtime\.sh/);
+  assert.match(dockerfile, /\/opt\/opencode\/python-version\.txt/);
+  assert.match(dockerfile, /\/usr\/local\/bin\/python3/);
+  assert.match(dockerfile, /\/usr\/local\/bin\/python\b/);
+  assert.match(dockerfile, /\/usr\/local\/bin\/pip3/);
+  assert.match(dockerfile, /\/usr\/local\/bin\/pip\b/);
+});
+
+test('Python runtime installer script builds CPython into /opt/python for the final image handoff', async () => {
+  assert.equal(await pathExists('../scripts/install-python-runtime.sh'), true);
+
+  const installer = await readText('../scripts/install-python-runtime.sh');
+
+  assert.match(installer, /PREFIX=\/opt\/python/);
+  assert.match(installer, /Python-\$\{PYTHON_VERSION\}\.tar\.xz/);
+  assert.match(installer, /\.\/configure --prefix="\$PREFIX"/);
+  assert.match(installer, /make -j"\$\(nproc\)"/);
+  assert.match(installer, /make install/);
+  assert.match(installer, /rm -rf "\$PREFIX\/share"/);
+  assert.match(installer, /rm -f "\$PREFIX"\/bin\/2to3\* "\$PREFIX"\/bin\/idle3\* "\$PREFIX"\/bin\/pydoc3\* "\$PREFIX"\/bin\/python3-config "\$PREFIX"\/bin\/python3\.\*-config/);
+  assert.match(installer, /find "\$PREFIX" .*__pycache__.*'\*\.pyc'.*'\*\.pyo'.*-exec rm -rf \{\} \+/);
+  assert.match(installer, /find "\$PREFIX" .*'\*\/test'.*'\*\/tests'.*-exec rm -rf \{\} \+/);
+  assert.match(installer, /find "\$PREFIX" .*'\*\.a'.*'\*\/pkgconfig'.*-exec rm -rf \{\} \+/);
+  assert.match(installer, /find "\$PREFIX" .*'\*\/config-[^']+'.*'\*\/idlelib'.*'\*\/turtledemo'.*-exec rm -rf \{\} \+/);
 });
