@@ -120,15 +120,16 @@ async function makeRuntimeFixture(options = {}) {
   const workspace = path.join(root, 'workspace');
   const configDir = path.join(root, 'opt/opencode');
   const pluginDir = path.join(configDir, 'plugins/opencode-oca-auth');
-  const skillsRoot = path.join(configDir, 'skills');
-  const skillsDir = path.join(skillsRoot, 'superpowers');
+  const superpowersDir = path.join(configDir, 'plugins/superpowers');
+  const superpowersPluginEntry = path.join(superpowersDir, '.opencode/plugins');
+  const skillsDir = path.join(superpowersDir, 'skills');
   const binDir = path.join(root, 'bin');
   const hostBinDir = path.join(root, 'host-bin');
   const metadataPath = path.join(configDir, 'mcp-versions.json');
 
   await mkdir(workspace, { recursive: true });
   await mkdir(pluginDir, { recursive: true });
-  await mkdir(path.join(configDir, 'plugins'), { recursive: true });
+  await mkdir(superpowersPluginEntry, { recursive: true });
   await mkdir(path.join(skillsDir, 'using-superpowers'), { recursive: true });
   await mkdir(path.join(skillsDir, 'brainstorming'), { recursive: true });
   await mkdir(binDir, { recursive: true });
@@ -167,7 +168,7 @@ async function makeRuntimeFixture(options = {}) {
       2,
     ) + '\n',
   );
-  await writeFile(path.join(configDir, 'plugins/superpowers.js'), 'export default {}\n');
+  await writeFile(path.join(superpowersPluginEntry, 'superpowers.js'), 'export default {}\n');
   await writeFile(path.join(skillsDir, 'using-superpowers/SKILL.md'), '# using-superpowers\n');
   await writeFile(path.join(skillsDir, 'brainstorming/SKILL.md'), '# brainstorming\n');
   await writeFile(path.join(configDir, 'python-version.txt'), `${pythonVersion}\n`, 'utf8');
@@ -193,11 +194,11 @@ if [[ "$1 $2" == "debug config" ]]; then
 {
   "plugin": [
     "file:///opt/opencode/plugins/opencode-oca-auth",
-    "file:///opt/opencode/plugins/superpowers.js"
+    "file:///opt/opencode/plugins/superpowers"
   ],
   "skills": {
     "paths": [
-      "$SUPERPOWERS_SKILLS_DIR/superpowers"
+      "$SUPERPOWERS_PLUGIN_DIR/skills"
     ]
   }
 }
@@ -234,7 +235,7 @@ exit 0
     workspace,
     configDir,
     pluginDir,
-    skillsRoot,
+    superpowersDir,
     skillsDir,
     binDir,
     hostBinDir,
@@ -272,7 +273,7 @@ async function runPreflight(fixture, env = {}) {
       WORKSPACE_DIR: fixture.workspace,
       OPENCODE_CONFIG: path.join(fixture.configDir, 'opencode.json'),
       OPENCODE_CONFIG_DIR: fixture.configDir,
-      SUPERPOWERS_SKILLS_DIR: fixture.skillsRoot,
+      SUPERPOWERS_PLUGIN_DIR: fixture.superpowersDir,
       MCP_VERSIONS_FILE: fixture.metadataPath,
       PATH: fixture.pathEnv,
       ...env,
@@ -597,11 +598,11 @@ test('verify-runtime preflight fails when a required port is unavailable', async
 test('verify-runtime preflight fails when bundled plugin assets are missing', async () => {
   const fixture = await makeRuntimeFixture();
   const result = await runPreflight(fixture, {
-    SUPERPOWERS_SKILLS_DIR: path.join(fixture.root, 'missing-skills'),
+    SUPERPOWERS_PLUGIN_DIR: path.join(fixture.root, 'missing-superpowers'),
   });
 
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /Missing bundled Superpowers skills/);
+  assert.match(result.stderr, /Missing Superpowers plugin/);
 });
 
 test('verify-runtime preflight fails when OCA models are not available through opencode', async () => {

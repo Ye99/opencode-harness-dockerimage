@@ -75,7 +75,7 @@ function makeBaseConfig() {
     },
     plugin: [
       'file:///opt/opencode/plugins/opencode-oca-auth',
-      'file:///opt/opencode/plugins/superpowers.js',
+      'file:///opt/opencode/plugins/superpowers',
     ],
     provider: {
       oca: {

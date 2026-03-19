@@ -20,7 +20,7 @@ function run(command, args, options = {}) {
   });
 }
 
-test('install-superpowers places plugin and skills into the packaged layout', async () => {
+test('install-superpowers preserves upstream tree layout under plugins/superpowers', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'install-superpowers-'));
   const srcDir = path.join(root, 'superpowers');
   const destDir = path.join(root, 'opencode');
@@ -32,7 +32,7 @@ test('install-superpowers places plugin and skills into the packaged layout', as
   });
 
   assert.equal(result.code, 0, result.stderr);
-  await stat(path.join(destDir, 'plugins/superpowers.js'));
-  await stat(path.join(destDir, 'skills/superpowers/using-superpowers/SKILL.md'));
-  await stat(path.join(destDir, 'skills/superpowers/brainstorming/SKILL.md'));
+  await stat(path.join(destDir, 'plugins/superpowers/.opencode/plugins/superpowers.js'));
+  await stat(path.join(destDir, 'plugins/superpowers/skills/using-superpowers/SKILL.md'));
+  await stat(path.join(destDir, 'plugins/superpowers/skills/brainstorming/SKILL.md'));
 });

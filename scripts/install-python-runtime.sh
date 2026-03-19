@@ -20,6 +20,11 @@ trap cleanup EXIT
 
 mkdir -p "$PREFIX"
 curl -fsSL "https://www.python.org/ftp/python/${PYTHON_VERSION}/${ARCHIVE}" -o "$BUILD_ROOT/$ARCHIVE"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/verify-python-archive.sh
+source "$SCRIPT_DIR/verify-python-archive.sh"
+verify_archive "$BUILD_ROOT/$ARCHIVE"
 tar -xJf "$BUILD_ROOT/$ARCHIVE" -C "$BUILD_ROOT"
 
 cd "$SOURCE_DIR"

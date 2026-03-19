@@ -12,10 +12,9 @@ PYTHON_VERSION_FILE="${PYTHON_VERSION_FILE:-$OPENCODE_CONFIG_DIR/python-version.
 OPENCODE_SERVER_PORT="${OPENCODE_SERVER_PORT:-4096}"
 OPENCODE_SERVER_HOST="${OPENCODE_SERVER_HOST:-0.0.0.0}"
 OCA_OAUTH_CALLBACK_PORT="${OCA_OAUTH_CALLBACK_PORT:-48801}"
-SUPERPOWERS_SKILLS_DIR="${SUPERPOWERS_SKILLS_DIR:-/opt/opencode/skills}"
-SUPERPOWERS_INSTALL_DIR="$SUPERPOWERS_SKILLS_DIR/superpowers"
 OCA_PLUGIN_DIR="${OCA_PLUGIN_DIR:-$OPENCODE_CONFIG_DIR/plugins/opencode-oca-auth}"
-SUPERPOWERS_PLUGIN="${SUPERPOWERS_PLUGIN:-$OPENCODE_CONFIG_DIR/plugins/superpowers.js}"
+SUPERPOWERS_PLUGIN_DIR="${SUPERPOWERS_PLUGIN_DIR:-$OPENCODE_CONFIG_DIR/plugins/superpowers}"
+SUPERPOWERS_PLUGIN_ENTRY="${SUPERPOWERS_PLUGIN_ENTRY:-$SUPERPOWERS_PLUGIN_DIR/.opencode/plugins/superpowers.js}"
 BRAVE_MCP_BINARY="mcp-server-brave-search"
 BRAVE_MCP_PACKAGE="@modelcontextprotocol/server-brave-search"
 
@@ -46,9 +45,9 @@ check_workspace() {
 check_assets() {
   [[ -f "$OPENCODE_CONFIG" ]] || fail "Missing OpenCode config: $OPENCODE_CONFIG"
   [[ -d "$OCA_PLUGIN_DIR" ]] || fail "Missing opencode-oca-auth plugin: $OCA_PLUGIN_DIR"
-  [[ -f "$SUPERPOWERS_PLUGIN" ]] || fail "Missing Superpowers plugin: $SUPERPOWERS_PLUGIN"
-  [[ -d "$SUPERPOWERS_INSTALL_DIR/using-superpowers" ]] || fail "Missing bundled Superpowers skills: $SUPERPOWERS_SKILLS_DIR"
-  [[ -d "$SUPERPOWERS_INSTALL_DIR/brainstorming" ]] || fail "Missing bundled Superpowers skills: $SUPERPOWERS_SKILLS_DIR"
+  [[ -f "$SUPERPOWERS_PLUGIN_ENTRY" ]] || fail "Missing Superpowers plugin: $SUPERPOWERS_PLUGIN_ENTRY"
+  [[ -d "$SUPERPOWERS_PLUGIN_DIR/skills/using-superpowers" ]] || fail "Missing bundled Superpowers skills: $SUPERPOWERS_PLUGIN_DIR/skills"
+  [[ -d "$SUPERPOWERS_PLUGIN_DIR/skills/brainstorming" ]] || fail "Missing bundled Superpowers skills: $SUPERPOWERS_PLUGIN_DIR/skills"
   command -v opencode >/dev/null 2>&1 || fail "opencode CLI not found in PATH"
   command -v "$BRAVE_MCP_BINARY" >/dev/null 2>&1 || fail "$BRAVE_MCP_BINARY not found in PATH"
   [[ -f "$MCP_VERSIONS_FILE" ]] || fail "Missing MCP metadata file: $MCP_VERSIONS_FILE"
@@ -88,8 +87,8 @@ check_config_visibility() {
   local output
   output="$(opencode debug config)"
   grep -q '/opt/opencode/plugins/opencode-oca-auth' <<<"$output" || fail 'OpenCode config output does not expose baked opencode-oca-auth plugin'
-  grep -q '/opt/opencode/plugins/superpowers.js' <<<"$output" || fail 'OpenCode config output does not expose baked Superpowers plugin'
-  grep -q "$SUPERPOWERS_INSTALL_DIR" <<<"$output" || fail "OpenCode config output does not expose $SUPERPOWERS_INSTALL_DIR"
+  grep -q '/opt/opencode/plugins/superpowers' <<<"$output" || fail 'OpenCode config output does not expose baked Superpowers plugin'
+  grep -q "$SUPERPOWERS_PLUGIN_DIR/skills" <<<"$output" || fail "OpenCode config output does not expose $SUPERPOWERS_PLUGIN_DIR/skills"
 }
 
 check_oca_models() {

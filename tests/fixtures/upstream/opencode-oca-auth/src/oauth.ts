@@ -5,7 +5,7 @@ function createOAuthCallbackServer() {
     start(handler) {
       if (server) return
       server = Bun.serve({
-        hostname: "127.0.0.1",
+        hostname: process.env.OCA_OAUTH_BIND_HOST ?? "127.0.0.1",
         port: OAUTH_PORT,
         fetch: handler,
       })

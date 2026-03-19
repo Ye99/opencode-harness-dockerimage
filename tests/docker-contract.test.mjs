@@ -29,7 +29,7 @@ test('Dockerfile installs opencode-ai 1.2.27 and declares the required env contr
   assert.match(dockerfile, /OPENCODE_CONFIG=/);
   assert.match(dockerfile, /OPENCODE_PERMISSION_JSON=/);
   assert.match(dockerfile, /OCA_OAUTH_CALLBACK_PORT=48801/);
-  assert.match(dockerfile, /SUPERPOWERS_SKILLS_DIR=\/opt\/opencode\/skills\b/);
+  assert.doesNotMatch(dockerfile, /SUPERPOWERS_SKILLS_DIR=/, 'SUPERPOWERS_SKILLS_DIR env is no longer needed');
 });
 
 test('Dockerfile packages the base template, render helper, and Brave MCP metadata', async () => {
@@ -61,7 +61,7 @@ test('config/opencode.json keeps the base OpenCode server and plugin contract', 
   assert.equal(config.server?.hostname, '0.0.0.0');
   assert.deepEqual(config.plugin, [
     'file:///opt/opencode/plugins/opencode-oca-auth',
-    'file:///opt/opencode/plugins/superpowers.js',
+    'file:///opt/opencode/plugins/superpowers',
   ]);
   assert.deepEqual(config.provider?.oca?.models?.['gpt-5.4'], {});
 });
@@ -373,6 +373,7 @@ test('Dockerfile builds Python in dedicated resolver and builder stages, then sh
   assert.match(dockerfile, /^FROM node:22-slim$/m);
   assert.match(dockerfile, /COPY scripts\/resolve-python-version\.mjs \/opt\/opencode\/scripts\/resolve-python-version\.mjs/);
   assert.match(dockerfile, /COPY scripts\/install-python-runtime\.sh \/opt\/opencode\/scripts\/install-python-runtime\.sh/);
+  assert.match(dockerfile, /COPY scripts\/verify-python-archive\.sh \/opt\/opencode\/scripts\/verify-python-archive\.sh/);
   assert.match(dockerfile, /\/opt\/opencode\/python-version\.txt/);
   assert.match(dockerfile, /\/usr\/local\/bin\/python3/);
   assert.match(dockerfile, /\/usr\/local\/bin\/python\b/);

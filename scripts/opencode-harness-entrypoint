@@ -8,7 +8,6 @@ export OPENCODE_SERVER_PORT="${OPENCODE_SERVER_PORT:-4096}"
 export OPENCODE_SERVER_HOST="${OPENCODE_SERVER_HOST:-0.0.0.0}"
 export OCA_OAUTH_BIND_HOST="${OCA_OAUTH_BIND_HOST:-0.0.0.0}"
 export OCA_OAUTH_CALLBACK_PORT="${OCA_OAUTH_CALLBACK_PORT:-48801}"
-export SUPERPOWERS_SKILLS_DIR="${SUPERPOWERS_SKILLS_DIR:-/opt/opencode/skills}"
 export WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
 export BROWSER="${BROWSER:-/bin/true}"
 AUTH_FILE="${XDG_DATA_HOME:-${HOME:-/root}/.local/share}/opencode/auth.json"
@@ -31,8 +30,10 @@ probe_host() {
 
 restart_requested=0
 child_pid=''
+shutting_down=0
 
 shutdown() {
+  shutting_down=1
   if [[ -n "$child_pid" ]]; then
     kill -- -"$child_pid" 2>/dev/null || true
     for _ in 1 2 3 4 5; do
@@ -64,6 +65,11 @@ while true; do
   setsid opencode web --hostname "$OPENCODE_SERVER_HOST" --port "$OPENCODE_SERVER_PORT" &
   child_pid="$!"
 
+  if [[ "$shutting_down" == 1 ]]; then
+    shutdown
+    exit 0
+  fi
+
   while kill -0 "$child_pid" 2>/dev/null; do
     sleep 2
     current_auth_signature="$(auth_signature)"
@@ -90,7 +96,9 @@ while true; do
   child_pid=''
 
   if [[ "$restart_requested" == 1 ]]; then
-    node -e 'const net=require("node:net"); const host=process.argv[1]; const port=Number(process.argv[2]); let attempts=0; const probe=()=>{ const socket=net.connect({host, port}); socket.once("connect", ()=>{ socket.destroy(); if (++attempts > 25) process.exit(1); setTimeout(probe, 200); }); socket.once("error", ()=>process.exit(0)); }; probe();' "$(probe_host)" "$OPENCODE_SERVER_PORT"
+    if ! node -e 'const net=require("node:net"); const host=process.argv[1]; const port=Number(process.argv[2]); let attempts=0; const probe=()=>{ const socket=net.connect({host, port}); socket.once("connect", ()=>{ socket.destroy(); if (++attempts > 25) process.exit(1); setTimeout(probe, 200); }); socket.once("error", ()=>process.exit(0)); }; probe();' "$(probe_host)" "$OPENCODE_SERVER_PORT"; then
+      printf 'port-drain-timeout: port %s still occupied after 5s, proceeding with restart\n' "$OPENCODE_SERVER_PORT" >&2
+    fi
     continue
   fi
 
