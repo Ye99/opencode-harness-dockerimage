@@ -51,7 +51,7 @@ if [[ "$1" == "/opt/opencode/scripts/render-opencode-config.mjs" ]]; then
   cp "$OPENCODE_TEST_BASE_CONFIG" "$3"
   exit 0
 fi
-if [[ "$1" == "-e" ]]; then
+if [[ "$1" == "/opt/opencode/scripts/port-drain-probe.mjs" ]]; then
   printf 'probe\\n' >> "$OPENCODE_TEST_LOG_DIR/probe.log"
   exit ${probeExitCode}
 fi

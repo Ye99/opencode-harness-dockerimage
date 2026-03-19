@@ -3,22 +3,7 @@ import test from 'node:test';
 import { mkdtemp, cp, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
-
-function run(command, args, options = {}) {
-  return new Promise((resolve) => {
-    const child = spawn(command, args, { ...options });
-    let stdout = '';
-    let stderr = '';
-    child.stdout?.on('data', (chunk) => {
-      stdout += chunk;
-    });
-    child.stderr?.on('data', (chunk) => {
-      stderr += chunk;
-    });
-    child.on('close', (code) => resolve({ code, stdout, stderr }));
-  });
-}
+import { run } from './helpers/run.mjs';
 
 test('install-superpowers preserves upstream tree layout under plugins/superpowers', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'install-superpowers-'));

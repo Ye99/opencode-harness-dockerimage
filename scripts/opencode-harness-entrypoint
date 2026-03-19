@@ -28,26 +28,29 @@ probe_host() {
   esac
 }
 
+terminate_child() {
+  kill -- -"$child_pid" 2>/dev/null || true
+  for _ in 1 2 3 4 5; do
+    if ! kill -0 "$child_pid" 2>/dev/null; then
+      return
+    fi
+    sleep 1
+  done
+  kill -9 -- -"$child_pid" 2>/dev/null || true
+}
+
 restart_requested=0
 child_pid=''
-shutting_down=0
+last_exit_code=0
 
 shutdown() {
-  shutting_down=1
   if [[ -n "$child_pid" ]]; then
-    kill -- -"$child_pid" 2>/dev/null || true
-    for _ in 1 2 3 4 5; do
-      if ! kill -0 "$child_pid" 2>/dev/null; then
-        break
-      fi
-      sleep 1
-    done
-    kill -9 -- -"$child_pid" 2>/dev/null || true
+    terminate_child
     wait "$child_pid" 2>/dev/null || true
   fi
 }
 
-trap 'shutdown; exit 0' INT TERM
+trap 'shutdown; exit $last_exit_code' INT TERM
 
 mkdir -p "$(dirname "$OPENCODE_CONFIG")"
 cd "$WORKSPACE_DIR"
@@ -65,42 +68,31 @@ while true; do
   setsid opencode web --hostname "$OPENCODE_SERVER_HOST" --port "$OPENCODE_SERVER_PORT" &
   child_pid="$!"
 
-  if [[ "$shutting_down" == 1 ]]; then
-    shutdown
-    exit 0
-  fi
-
   while kill -0 "$child_pid" 2>/dev/null; do
     sleep 2
     current_auth_signature="$(auth_signature)"
     if [[ "$current_auth_signature" != "$previous_auth_signature" ]]; then
       restart_requested=1
       printf 'auth-change-restart\n' >&2
-      kill -- -"$child_pid" 2>/dev/null || true
-      for _ in 1 2 3 4 5; do
-        if ! kill -0 "$child_pid" 2>/dev/null; then
-          break
-        fi
-        sleep 1
-      done
-      kill -9 -- -"$child_pid" 2>/dev/null || true
+      terminate_child
       break
     fi
   done
 
   if wait "$child_pid"; then
-    exit_code=0
+    last_exit_code=0
   else
-    exit_code=$?
+    last_exit_code=$?
   fi
   child_pid=''
 
   if [[ "$restart_requested" == 1 ]]; then
-    if ! node -e 'const net=require("node:net"); const host=process.argv[1]; const port=Number(process.argv[2]); let attempts=0; const probe=()=>{ const socket=net.connect({host, port}); socket.once("connect", ()=>{ socket.destroy(); if (++attempts > 25) process.exit(1); setTimeout(probe, 200); }); socket.once("error", ()=>process.exit(0)); }; probe();' "$(probe_host)" "$OPENCODE_SERVER_PORT"; then
+    last_exit_code=0
+    if ! node "/opt/opencode/scripts/port-drain-probe.mjs" "$(probe_host)" "$OPENCODE_SERVER_PORT"; then
       printf 'port-drain-timeout: port %s still occupied after 5s, proceeding with restart\n' "$OPENCODE_SERVER_PORT" >&2
     fi
     continue
   fi
 
-  exit "$exit_code"
+  exit "$last_exit_code"
 done

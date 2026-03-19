@@ -33,13 +33,13 @@ RUN --mount=type=bind,from=python-source,source=/tmp/python-packages.txt,target=
 
 RUN --mount=type=cache,target=/root/.npm \
     mkdir -p /opt/opencode \
-  && npm install -g opencode-ai@1.2.27 @modelcontextprotocol/server-brave-search@latest \
+  && npm install -g opencode-ai@1.2.27 @modelcontextprotocol/server-brave-search@0.6.2 \
   && npm ls -g @modelcontextprotocol/server-brave-search --json --depth=0 > /opt/opencode/mcp-versions.json \
   && rm -rf /usr/local/lib/node_modules/opencode-ai/node_modules/opencode-linux-*-musl /tmp/*
 
 COPY config/opencode.json /opt/opencode/opencode.base.json
 COPY --chmod=755 scripts/opencode-harness-entrypoint /usr/local/bin/opencode-harness-entrypoint
-COPY --chmod=755 scripts/install-superpowers.sh scripts/check-mcp-discovery.mjs scripts/render-opencode-config.mjs scripts/validate-sources-lock.mjs scripts/verify-runtime.sh /opt/opencode/scripts/
+COPY --chmod=755 scripts/install-superpowers.sh scripts/check-mcp-discovery.mjs scripts/port-drain-probe.mjs scripts/preflight-node-checks.mjs scripts/render-opencode-config.mjs scripts/validate-sources-lock.mjs scripts/verify-runtime.sh /opt/opencode/scripts/
 COPY vendor/ /opt/opencode/vendor/
 
 RUN ln -sf /usr/local/bin/python3 /usr/local/bin/python \

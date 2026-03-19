@@ -22,20 +22,6 @@ fail() {
   exit 1
 }
 
-check_port_available() {
-  local host="$1"
-  local port="$2"
-
-  node -e '
-    const net = require("node:net");
-    const [host, port] = process.argv.slice(1);
-    const server = net.createServer();
-    server.once("error", () => process.exit(1));
-    server.once("listening", () => server.close(() => process.exit(0)));
-    server.listen(Number(port), host);
-  ' "$host" "$port" || fail "Port is unavailable: ${host}:${port}"
-}
-
 check_workspace() {
   [[ -d "$WORKSPACE_DIR" ]] || fail "Missing mounted workspace: $WORKSPACE_DIR"
   [[ -w "$WORKSPACE_DIR" ]] || fail "Mounted workspace is not writable: $WORKSPACE_DIR"
@@ -50,13 +36,6 @@ check_assets() {
   command -v opencode >/dev/null 2>&1 || fail "opencode CLI not found in PATH"
   command -v "$BRAVE_MCP_BINARY" >/dev/null 2>&1 || fail "$BRAVE_MCP_BINARY not found in PATH"
   [[ -f "$MCP_VERSIONS_FILE" ]] || fail "Missing MCP metadata file: $MCP_VERSIONS_FILE"
-  node -e '
-    const fs = require("node:fs");
-    const [filePath, packageName] = process.argv.slice(1);
-    const metadata = JSON.parse(fs.readFileSync(filePath, "utf8"));
-    const version = metadata?.dependencies?.[packageName]?.version;
-    process.exit(typeof version === "string" && version.length > 0 ? 0 : 1);
-  ' "$MCP_VERSIONS_FILE" "$BRAVE_MCP_PACKAGE" || fail "Missing Brave MCP version metadata: $MCP_VERSIONS_FILE"
 }
 
 check_python_runtime() {
@@ -78,6 +57,19 @@ check_python_runtime() {
   rm -rf "$venv_dir"
 }
 
+check_ports_metadata_and_brave_state() {
+  local node_output
+
+  node_output="$(node "$SCRIPT_DIR/preflight-node-checks.mjs" \
+    --check-port "$OPENCODE_SERVER_HOST:$OPENCODE_SERVER_PORT" \
+    --check-port "0.0.0.0:$OCA_OAUTH_CALLBACK_PORT" \
+    --mcp-metadata "$MCP_VERSIONS_FILE" "$BRAVE_MCP_PACKAGE" \
+    --config "$OPENCODE_CONFIG" \
+    2>&1)" || { local first_error; IFS= read -r first_error <<< "$node_output"; fail "$first_error"; }
+
+  RENDERED_BRAVE_STATE="$node_output"
+}
+
 check_config_visibility() {
   local output
   output="$(opencode debug config)"
@@ -92,19 +84,6 @@ check_oca_models() {
   grep -q 'oca/' <<<"$output" || fail 'OpenCode does not expose OCA models from the baked auth plugin'
 }
 
-rendered_brave_enabled() {
-  local state
-
-  state="$(node -e '
-    const fs = require("node:fs");
-    const [configPath] = process.argv.slice(1);
-    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    process.stdout.write(config?.mcp?.["brave-search"]?.enabled === true ? "enabled" : "disabled");
-  ' "$OPENCODE_CONFIG")" || fail "OpenCode config is unreadable or malformed: $OPENCODE_CONFIG"
-
-  [[ "$state" == 'enabled' ]]
-}
-
 check_mcp_discovery() {
   local output
   local helper_output
@@ -115,7 +94,7 @@ check_mcp_discovery() {
 
   output="$(opencode mcp list 2>&1)" || fail "opencode mcp list failed: $output"
 
-  if rendered_brave_enabled; then
+  if [[ "$RENDERED_BRAVE_STATE" == 'enabled' ]]; then
     helper_args+=(--require-enabled brave-search)
   else
     helper_args+=(--require-missing-or-disabled brave-search)
@@ -124,13 +103,14 @@ check_mcp_discovery() {
   helper_output="$(printf '%s' "$output" | node "$SCRIPT_DIR/check-mcp-discovery.mjs" "${helper_args[@]}" 2>&1)" || fail "$helper_output"
 }
 
+RENDERED_BRAVE_STATE='disabled'
+
 case "$COMMAND" in
   preflight)
     check_workspace
     check_assets
     check_python_runtime
-    check_port_available "$OPENCODE_SERVER_HOST" "$OPENCODE_SERVER_PORT"
-    check_port_available '0.0.0.0' "$OCA_OAUTH_CALLBACK_PORT"
+    check_ports_metadata_and_brave_state
     check_config_visibility
     check_oca_models
     check_mcp_discovery

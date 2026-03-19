@@ -3,23 +3,8 @@ import test from 'node:test';
 import { chmod, copyFile, mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import net from 'node:net';
-
-function run(command, args, options = {}) {
-  return new Promise((resolve) => {
-    const child = spawn(command, args, { ...options });
-    let stdout = '';
-    let stderr = '';
-    child.stdout?.on('data', (chunk) => {
-      stdout += chunk;
-    });
-    child.stderr?.on('data', (chunk) => {
-      stderr += chunk;
-    });
-    child.on('close', (code) => resolve({ code, stdout, stderr }));
-  });
-}
+import { run } from './helpers/run.mjs';
 
 async function writeExecutable(filePath, contents) {
   await writeFile(filePath, contents, 'utf8');

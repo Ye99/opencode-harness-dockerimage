@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { chmod, readFile, writeFile } from 'node:fs/promises';
 
 const [, , basePath, outputPath] = process.argv;
 
@@ -7,7 +7,15 @@ if (!basePath || !outputPath) {
   process.exit(1);
 }
 
-const baseConfig = JSON.parse(await readFile(basePath, 'utf8'));
+let baseConfig;
+
+try {
+  baseConfig = JSON.parse(await readFile(basePath, 'utf8'));
+} catch (error) {
+  console.error(`Cannot read base config: ${basePath}: ${error.message}`);
+  process.exit(1);
+}
+
 const braveApiKey = process.env.BRAVE_API_KEY?.trim() ?? '';
 const permissionJson = process.env.OPENCODE_PERMISSION_JSON?.trim() ?? '';
 const config = structuredClone(baseConfig);
@@ -50,4 +58,12 @@ if (braveApiKey) {
   delete braveConfig.environment;
 }
 
-await writeFile(outputPath, `${JSON.stringify(config, null, 2)}\n`);
+const contents = `${JSON.stringify(config, null, 2)}\n`;
+
+try {
+  await writeFile(outputPath, contents);
+  await chmod(outputPath, 0o600);
+} catch (error) {
+  console.error(`Cannot write config: ${outputPath}: ${error.message}`);
+  process.exit(1);
+}

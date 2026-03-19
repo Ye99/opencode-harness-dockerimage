@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { access, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 
 async function readText(relativePath) {
   return readFile(new URL(relativePath, import.meta.url), 'utf8');
@@ -8,15 +8,6 @@ async function readText(relativePath) {
 
 async function readJson(relativePath) {
   return JSON.parse(await readText(relativePath));
-}
-
-async function pathExists(relativePath) {
-  try {
-    await access(new URL(relativePath, import.meta.url));
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function normalizeWhitespace(text) {
@@ -44,12 +35,14 @@ test('Dockerfile packages the base template, render helper, and Brave MCP metada
   assert.match(scriptsCopy, /validate-sources-lock\.mjs/);
   assert.match(scriptsCopy, /verify-runtime\.sh/);
   assert.match(scriptsCopy, /install-superpowers\.sh/);
+  assert.match(scriptsCopy, /port-drain-probe\.mjs/);
+  assert.match(scriptsCopy, /preflight-node-checks\.mjs/);
 
   assert.match(dockerfile, /COPY vendor\/ \/opt\/opencode\/vendor\//);
   assert.match(dockerfile, /rm -rf \/var\/lib\/apt\/lists\/\*/);
   assert.match(dockerfile, /mkdir -p \/opt\/opencode/);
   assert.match(dockerfile, /npm install -g [^\n]*opencode-ai@1\.2\.27/);
-  assert.match(dockerfile, /npm install -g [^\n]*@modelcontextprotocol\/server-brave-search@latest/);
+  assert.match(dockerfile, /npm install -g [^\n]*@modelcontextprotocol\/server-brave-search@\d+\.\d+\.\d+/);
   assert.match(dockerfile, /npm ls -g @modelcontextprotocol\/server-brave-search --json --depth=0 > \/opt\/opencode\/mcp-versions\.json/);
 });
 
@@ -267,8 +260,8 @@ test('entrypoint renders the live config before preflight and then supervises op
   assert.ok(preflightIndex < startupIndex);
 });
 
-test('smoke-mcp-runtime rebuilds the image and cleans up test containers', async () => {
-  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+test('verify-image rebuilds the image and cleans up test containers', async () => {
+  const smokeScript = await readText('../scripts/verify-image.sh');
 
   assert.match(smokeScript, /BRAVE_API_KEY_DUMMY=/);
   assert.match(smokeScript, /docker build --pull --no-cache -t "\$IMAGE_TAG" \./);
@@ -277,8 +270,8 @@ test('smoke-mcp-runtime rebuilds the image and cleans up test containers', async
   assert.match(smokeScript, /docker rm -f/);
 });
 
-test('smoke-mcp-runtime checks the packaged Brave MCP binary and metadata version', async () => {
-  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+test('verify-image checks the packaged Brave MCP binary and metadata version', async () => {
+  const smokeScript = await readText('../scripts/verify-image.sh');
 
   assert.match(smokeScript, /command -v mcp-server-brave-search/);
   assert.match(smokeScript, /npm ls -g @modelcontextprotocol\/server-brave-search --depth=0/);
@@ -286,8 +279,8 @@ test('smoke-mcp-runtime checks the packaged Brave MCP binary and metadata versio
   assert.match(smokeScript, /Brave MCP version mismatch:/);
 });
 
-test('smoke-mcp-runtime verifies rendered Brave state against discovered MCP output', async () => {
-  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+test('verify-image verifies rendered Brave state against discovered MCP output', async () => {
+  const smokeScript = await readText('../scripts/verify-image.sh');
 
   assert.match(smokeScript, /opencode mcp list/);
   assert.match(smokeScript, /check-mcp-discovery\.mjs/);
@@ -299,8 +292,8 @@ test('smoke-mcp-runtime verifies rendered Brave state against discovered MCP out
   assert.match(smokeScript, /Rendered brave-search state mismatch:/);
 });
 
-test('smoke-mcp-runtime validates the packaged startup path instead of overriding the entrypoint', async () => {
-  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+test('verify-image validates the packaged startup path instead of overriding the entrypoint', async () => {
+  const smokeScript = await readText('../scripts/verify-image.sh');
 
   assert.doesNotMatch(smokeScript, /--entrypoint bash/);
   assert.match(smokeScript, /docker inspect -f '\{\{\.State.Status\}\}'/);
@@ -308,8 +301,8 @@ test('smoke-mcp-runtime validates the packaged startup path instead of overridin
   assert.match(smokeScript, /exec_checks/);
 });
 
-test('smoke-mcp-runtime starts Brave with only the API key in a clean env', async () => {
-  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+test('verify-image starts Brave with only the API key in a clean env', async () => {
+  const smokeScript = await readText('../scripts/verify-image.sh');
   const envLine = smokeScript.match(/env -i[^\n]*/)?.[0];
 
   assert.ok(envLine, 'expected smoke script to launch Brave via env -i');
@@ -319,15 +312,15 @@ test('smoke-mcp-runtime starts Brave with only the API key in a clean env', asyn
   assert.doesNotMatch(smokeScript, /env -i [^\n]*(PATH|HOME)=/);
 });
 
-test('smoke-mcp-runtime accepts either a timeout hold-open or a Brave startup banner', async () => {
-  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+test('verify-image accepts either a timeout hold-open or a Brave startup banner', async () => {
+  const smokeScript = await readText('../scripts/verify-image.sh');
 
   assert.match(smokeScript, /Brave Search MCP Server running on stdio/);
   assert.match(smokeScript, /if \[\[ "\$status" -ne 124 \]\] && ! grep -Fq 'Brave Search MCP Server running on stdio' \/tmp\/brave-startup\.txt; then/);
 });
 
-test('smoke-mcp-runtime verifies the packaged Python runtime commands', async () => {
-  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+test('verify-image verifies the packaged Python runtime commands', async () => {
+  const smokeScript = await readText('../scripts/verify-image.sh');
 
   assert.match(smokeScript, /command -v python3 >\/dev\/null/);
   assert.match(smokeScript, /command -v python >\/dev\/null/);
@@ -347,8 +340,8 @@ test('smoke-mcp-runtime verifies the packaged Python runtime commands', async ()
   assert.match(smokeScript, /sys\.executable/);
 });
 
-test('smoke-mcp-runtime always validates remote MCP discovery, independent of smoke state names', async () => {
-  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+test('verify-image always validates remote MCP discovery, independent of smoke state names', async () => {
+  const smokeScript = await readText('../scripts/verify-image.sh');
 
   assert.match(smokeScript, /--require-enabled context7/);
   assert.match(smokeScript, /--require-enabled grep_app/);
@@ -356,8 +349,8 @@ test('smoke-mcp-runtime always validates remote MCP discovery, independent of sm
   assert.doesNotMatch(smokeScript, /SMOKE_STATE_NAME" == \*-online/);
 });
 
-test('smoke-mcp-runtime exercises keyed and no-key Brave states with and without egress', async () => {
-  const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
+test('verify-image exercises keyed and no-key Brave states with and without egress', async () => {
+  const smokeScript = await readText('../scripts/verify-image.sh');
 
   for (const invocation of [
     'run_state keyed-online bridge true',

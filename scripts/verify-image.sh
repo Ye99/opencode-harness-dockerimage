@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-IMAGE_TAG="${IMAGE_TAG:-opencode-harness:smoke-mcp-runtime}"
+IMAGE_TAG="${IMAGE_TAG:-opencode-harness:verify-image}"
 BRAVE_API_KEY_DUMMY="${BRAVE_API_KEY_DUMMY:-dummy-brave-key}"
 
 declare -a CONTAINERS=()
@@ -193,7 +193,7 @@ run_state() {
   local state_name="$1"
   local network_mode="$2"
   local expect_has_key="$3"
-  local container_name="smoke-mcp-runtime-${state_name}-$$"
+  local container_name="verify-image-${state_name}-$$"
   local -a docker_args=(
     run
     --detach
@@ -221,10 +221,41 @@ run_state() {
 
 main() {
   build_image
-  run_state keyed-online bridge true
-  run_state no-key-online bridge false
-  run_state keyed-no-egress none true
-  run_state no-key-no-egress none false
+
+  local -a state_pids=()
+  local -a state_names=()
+
+  for state_spec in \
+    'keyed-online bridge true' \
+    'no-key-online bridge false' \
+    'keyed-no-egress none true' \
+    'no-key-no-egress none false' \
+  ; do
+    read -r name network key <<<"$state_spec"
+    CONTAINERS+=("verify-image-${name}-$$")
+  done
+
+  run_state keyed-online bridge true &
+  state_pids+=($!); state_names+=(keyed-online)
+  run_state no-key-online bridge false &
+  state_pids+=($!); state_names+=(no-key-online)
+  run_state keyed-no-egress none true &
+  state_pids+=($!); state_names+=(keyed-no-egress)
+  run_state no-key-no-egress none false &
+  state_pids+=($!); state_names+=(no-key-no-egress)
+
+  local failed=0
+  for i in "${!state_pids[@]}"; do
+    if ! wait "${state_pids[$i]}"; then
+      printf 'smoke state failed: %s\n' "${state_names[$i]}" >&2
+      failed=1
+    fi
+  done
+
+  if [[ "$failed" == 1 ]]; then
+    exit 1
+  fi
+
   printf 'smoke-ok\n'
 }
 

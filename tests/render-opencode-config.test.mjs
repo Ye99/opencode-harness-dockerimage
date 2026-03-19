@@ -1,26 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
+import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { run } from './helpers/run.mjs';
 
 const projectRoot = path.resolve(new URL('..', import.meta.url).pathname);
 
-function run(command, args, options = {}) {
-  return new Promise((resolve) => {
-    const child = spawn(command, args, { ...options });
-    let stdout = '';
-    let stderr = '';
-    child.stdout?.on('data', (chunk) => {
-      stdout += chunk;
-    });
-    child.stderr?.on('data', (chunk) => {
-      stderr += chunk;
-    });
-    child.on('close', (code) => resolve({ code, stdout, stderr }));
-  });
-}
+const REAL_BASE_CONFIG = JSON.parse(
+  await readFile(new URL('../config/opencode.json', import.meta.url), 'utf8'),
+);
 
 async function renderConfig(baseConfig, options = {}) {
   const tempDir = await mkdtemp(path.join(tmpdir(), 'render-opencode-config-'));
@@ -66,82 +55,7 @@ async function renderConfig(baseConfig, options = {}) {
 }
 
 function makeBaseConfig() {
-  return {
-    $schema: 'https://opencode.ai/config.json',
-    model: 'oca/gpt-5.4',
-    server: {
-      port: 4096,
-      hostname: '0.0.0.0',
-    },
-    plugin: [
-      'file:///opt/opencode/plugins/opencode-oca-auth',
-      'file:///opt/opencode/plugins/superpowers',
-    ],
-    provider: {
-      oca: {
-        models: {
-          'gpt-5.4': {},
-        },
-      },
-    },
-    permission: {
-      read: {
-        '*': 'allow',
-        '*.env': 'deny',
-        '*.env.*': 'deny',
-        '*.env.example': 'allow',
-      },
-      edit: 'allow',
-      glob: 'allow',
-      grep: 'allow',
-      list: 'allow',
-      bash: {
-        '*': 'allow',
-        'git push': 'ask',
-        'git push *': 'ask',
-        'git push *--force*': 'deny',
-        'git push *--mirror*': 'deny',
-        'git clean': 'ask',
-        'git reset --hard*': 'ask',
-        'git clean *': 'ask',
-        rm: 'ask',
-        'rm *': 'ask',
-        'rm -rf /': 'deny',
-        'rm -rf /*': 'deny',
-        'rm -rf ~': 'deny',
-        'rm -rf ~/*': 'deny',
-        sudo: 'deny',
-        'sudo *': 'deny',
-      },
-      task: 'allow',
-      skill: 'allow',
-      lsp: 'allow',
-      todoread: 'allow',
-      todowrite: 'allow',
-      webfetch: 'allow',
-      websearch: 'allow',
-      codesearch: 'allow',
-      external_directory: 'ask',
-      doom_loop: 'ask',
-    },
-    mcp: {
-      context7: {
-        type: 'remote',
-        url: 'https://mcp.context7.com/mcp',
-        enabled: true,
-      },
-      grep_app: {
-        type: 'remote',
-        url: 'https://mcp.grep.app',
-        enabled: true,
-      },
-      'brave-search': {
-        type: 'local',
-        command: ['mcp-server-brave-search'],
-        enabled: false,
-      },
-    },
-  };
+  return structuredClone(REAL_BASE_CONFIG);
 }
 
 test('render fixture keeps exact bare-command bash guardrails alongside wildcard rules', () => {
@@ -285,4 +199,80 @@ test('render fails fast when OPENCODE_PERMISSION_JSON parses to an invalid type'
   assert.equal(result.config, undefined);
   assert.match(result.stderr, /OPENCODE_PERMISSION_JSON/);
   assert.match(result.stderr, /object or JSON string/i);
+});
+
+test('render fails fast when OPENCODE_PERMISSION_JSON parses to null', async () => {
+  const result = await renderConfig(makeBaseConfig(), {
+    permissionJson: 'null',
+  });
+
+  assert.equal(result.code, 1);
+  assert.equal(result.config, undefined);
+  assert.match(result.stderr, /OPENCODE_PERMISSION_JSON/);
+  assert.match(result.stderr, /object or JSON string/i);
+});
+
+test('render fails fast when OPENCODE_PERMISSION_JSON parses to an array', async () => {
+  const result = await renderConfig(makeBaseConfig(), {
+    permissionJson: '["allow"]',
+  });
+
+  assert.equal(result.code, 1);
+  assert.equal(result.config, undefined);
+  assert.match(result.stderr, /OPENCODE_PERMISSION_JSON/);
+  assert.match(result.stderr, /object or JSON string/i);
+});
+
+test('render fails when required CLI args are missing', async () => {
+  const result = await run(process.execPath, ['scripts/render-opencode-config.mjs'], {
+    cwd: projectRoot,
+  });
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Usage/);
+});
+
+test('render fails when base config file is missing', async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), 'render-opencode-config-'));
+  const outputPath = path.join(tempDir, 'output.json');
+  const result = await run(
+    process.execPath,
+    ['scripts/render-opencode-config.mjs', path.join(tempDir, 'nonexistent.json'), outputPath],
+    { cwd: projectRoot },
+  );
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Cannot read base config/);
+});
+
+test('render fails when base config is invalid JSON', async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), 'render-opencode-config-'));
+  const basePath = path.join(tempDir, 'base.json');
+  const outputPath = path.join(tempDir, 'output.json');
+  await writeFile(basePath, '{not valid json}');
+  const result = await run(
+    process.execPath,
+    ['scripts/render-opencode-config.mjs', basePath, outputPath],
+    { cwd: projectRoot },
+  );
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Cannot read base config/);
+});
+
+test('render fails when base config lacks brave-search MCP entry', async () => {
+  const config = makeBaseConfig();
+  delete config.mcp['brave-search'];
+  const result = await renderConfig(config);
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Missing mcp\["brave-search"\]/);
+});
+
+test('render sets output file permissions to 0600', async () => {
+  const result = await renderConfig(makeBaseConfig());
+
+  assert.equal(result.code, 0, result.stderr);
+  const stats = await stat(result.outputPath);
+  assert.equal(stats.mode & 0o777, 0o600);
 });
