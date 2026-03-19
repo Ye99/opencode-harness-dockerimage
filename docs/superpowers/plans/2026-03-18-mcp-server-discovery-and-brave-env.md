@@ -290,8 +290,7 @@ test('Dockerfile copies the immutable base config, packages the render helper, a
   assert.match(dockerfile, /COPY scripts\/render-opencode-config\.mjs \/opt\/opencode\/scripts\/render-opencode-config\.mjs/);
   assert.match(dockerfile, /npm install -g opencode-ai@1\.2\.27 @modelcontextprotocol\/server-brave-search@latest/);
   assert.match(dockerfile, /mcp-versions\.json/);
-  assert.match(dockerfile, /npm ls -g @modelcontextprotocol\/server-brave-search --json --depth=0/);
-  assert.match(dockerfile, /"@modelcontextprotocol\/server-brave-search": version/);
+  assert.match(dockerfile, /npm ls -g @modelcontextprotocol\/server-brave-search --json --depth=0 > \/opt\/opencode\/mcp-versions\.json/);
 });
 
 test('entrypoint renders config before verify-runtime', async () => {
@@ -317,7 +316,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/* \
   && mkdir -p /opt/opencode/scripts \
   && npm install -g opencode-ai@1.2.27 @modelcontextprotocol/server-brave-search@latest \
-  && node -e 'const fs=require("node:fs"); const {execSync}=require("node:child_process"); const tree=JSON.parse(execSync("npm ls -g @modelcontextprotocol/server-brave-search --json --depth=0", {encoding:"utf8"})); const version=tree.dependencies["@modelcontextprotocol/server-brave-search"].version; fs.writeFileSync("/opt/opencode/mcp-versions.json", JSON.stringify({"@modelcontextprotocol/server-brave-search": version}, null, 2) + "\n")'
+  && npm ls -g @modelcontextprotocol/server-brave-search --json --depth=0 > /opt/opencode/mcp-versions.json
 
 COPY config/opencode.json /opt/opencode/opencode.base.json
 COPY scripts/render-opencode-config.mjs /opt/opencode/scripts/render-opencode-config.mjs
@@ -378,7 +377,11 @@ async function makeRuntimeFixture({ config, mcpListOutput = 'context7\ngrep_app\
   }, null, 2)}\n`);
 
   if (!omitBraveMetadata) {
-    await writeFile(path.join(configDir, 'mcp-versions.json'), '{"@modelcontextprotocol/server-brave-search":"latest"}\n');
+    await writeFile(path.join(configDir, 'mcp-versions.json'), JSON.stringify({
+      dependencies: {
+        '@modelcontextprotocol/server-brave-search': { version: 'latest' },
+      },
+    }, null, 2) + '\n');
   }
 
   await writeFile(path.join(configDir, 'plugins/superpowers.js'), 'export default {}\n');
@@ -640,7 +643,7 @@ check_mcp_discovery() {
 }
 
 check_brave_metadata() {
-  node -e 'const fs=require("node:fs"); const data=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if (!data["@modelcontextprotocol/server-brave-search"]) process.exit(1);' "$OPENCODE_CONFIG_DIR/mcp-versions.json" \
+  node -e 'const fs=require("node:fs"); const [filePath, packageName]=process.argv.slice(1); const metadata=JSON.parse(fs.readFileSync(filePath, "utf8")); const version=metadata?.dependencies?.[packageName]?.version; process.exit(typeof version === "string" && version.length > 0 ? 0 : 1);' "$MCP_VERSIONS_FILE" "$BRAVE_MCP_PACKAGE" \
     || fail 'Missing Brave MCP version metadata'
 }
 ```
@@ -744,7 +747,7 @@ assert_common_runtime() {
   docker exec "$name" sh -lc 'command -v mcp-server-brave-search'
   docker exec "$name" npm ls -g @modelcontextprotocol/server-brave-search --depth=0
   docker exec "$name" cat /opt/opencode/mcp-versions.json
-  docker exec "$name" node -e 'const fs=require("node:fs"); const {execSync}=require("node:child_process"); const meta=JSON.parse(fs.readFileSync("/opt/opencode/mcp-versions.json", "utf8")); const tree=JSON.parse(execSync("npm ls -g @modelcontextprotocol/server-brave-search --json --depth=0", {encoding:"utf8"})); const installed=tree.dependencies["@modelcontextprotocol/server-brave-search"].version; if (meta["@modelcontextprotocol/server-brave-search"] !== installed) process.exit(1);'
+  docker exec "$name" node -e 'const fs=require("node:fs"); const {execSync}=require("node:child_process"); const meta=JSON.parse(fs.readFileSync("/opt/opencode/mcp-versions.json", "utf8")); const packageRoot=execSync("npm root -g", {encoding:"utf8"}).trim(); const installed=JSON.parse(fs.readFileSync(`${packageRoot}/@modelcontextprotocol/server-brave-search/package.json`, "utf8")); const metaVersion=meta?.dependencies?.["@modelcontextprotocol/server-brave-search"]?.version; if (!metaVersion || metaVersion !== installed.version) process.exit(1);'
 }
 
 read_rendered_brave_enabled() {

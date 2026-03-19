@@ -175,9 +175,9 @@ make install
     - copy resolved version to `/opt/opencode/python-version.txt`
     - symlink:
       - `/usr/local/bin/python3 -> /opt/python/bin/python3`
-      - `/usr/local/bin/python -> /usr/local/bin/python3`
+      - `/usr/local/bin/python -> /opt/python/bin/python3`
       - `/usr/local/bin/pip3 -> /opt/python/bin/pip3`
-      - `/usr/local/bin/pip -> /usr/local/bin/pip3`
+      - `/usr/local/bin/pip -> /opt/python/bin/pip3`
 
 - [ ] **Step 5: Keep the final image small**
   - do not leave compiler packages in the final stage

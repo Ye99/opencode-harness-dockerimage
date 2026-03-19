@@ -105,6 +105,7 @@ ENTRYPOINT ["/usr/local/bin/opencode-harness-entrypoint"]
 
 ```json
 {
+  "$schema": "https://opencode.ai/config.json",
   "model": "oca/gpt-5.4",
   "server": {
     "port": 4096,
@@ -120,6 +121,31 @@ ENTRYPOINT ["/usr/local/bin/opencode-harness-entrypoint"]
         "gpt-5.4": {}
       }
     }
+  },
+  "permission": {
+    "read": { "*": "allow", "*.env": "deny", "*.env.*": "deny", "*.env.example": "allow" },
+    "edit": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "bash": {
+      "*": "allow",
+      "git push": "ask", "git push *": "ask",
+      "git push *--force*": "deny", "git push *--mirror*": "deny",
+      "git clean": "ask", "git reset --hard*": "ask", "git clean *": "ask",
+      "rm": "ask", "rm *": "ask",
+      "rm -rf /": "deny", "rm -rf /*": "deny", "rm -rf ~": "deny", "rm -rf ~/*": "deny",
+      "sudo": "deny", "sudo *": "deny"
+    },
+    "task": "allow", "skill": "allow", "lsp": "allow",
+    "todoread": "allow", "todowrite": "allow",
+    "webfetch": "allow", "websearch": "allow", "codesearch": "allow",
+    "external_directory": "ask", "doom_loop": "ask"
+  },
+  "mcp": {
+    "context7": { "type": "remote", "url": "https://mcp.context7.com/mcp", "enabled": true },
+    "grep_app": { "type": "remote", "url": "https://mcp.grep.app", "enabled": true },
+    "brave-search": { "type": "local", "command": ["mcp-server-brave-search"], "enabled": false }
   }
 }
 ```
@@ -172,8 +198,11 @@ docker build -f Dockerfile -t opencode-harness .
 ### Run
 
 ```bash
+export BRAVE_API_KEY=your-brave-search-api-key
+
 docker run -it \
   --name opencode-harness \
+  -e BRAVE_API_KEY \
   -p 127.0.0.1:4096:4096 \
   -p 127.0.0.1:48801:48801 \
   -v "<host-project-workspace>:/workspace" \
@@ -181,6 +210,7 @@ docker run -it \
 ```
 
 Replace `<host-project-workspace>` with the host path of the project you want OpenCode to operate on.
+If `BRAVE_API_KEY` is unset, the container still starts and the rendered config keeps `brave-search` disabled.
 If the engineer stops and later restarts the same container with `docker start -ai opencode-harness`, the container keeps its auth state and does not require another login.
 
 ### Optional Auth-State Backup
@@ -219,6 +249,7 @@ Open `http://127.0.0.1:4096` in browser on same host.
 ```bash
 curl http://127.0.0.1:4096/global/health
 docker exec -it opencode-harness opencode debug config
+docker exec -it opencode-harness opencode mcp list
 docker exec -it opencode-harness opencode models oca
 docker exec -it opencode-harness opencode -m oca/gpt-5.4 run "what skills do you have? what mcp do you have"
 ```
