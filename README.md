@@ -16,17 +16,18 @@ Build a single Docker image that packages OpenCode for both coding and code revi
 docker build -f Dockerfile -t opencode-harness .
 ```
 
-Default `PYTHON_VERSION` is `latest-stable`.
+Default `PYTHON_VERSION` is `3` (latest stable Python 3.x from the official Docker image).
 
-Override it explicitly when needed:
+Pin to a minor or exact version when needed:
 
 ```bash
+docker build -f Dockerfile -t opencode-harness --build-arg PYTHON_VERSION=3.14 .
 docker build -f Dockerfile -t opencode-harness --build-arg PYTHON_VERSION=3.14.3 .
 ```
 
 The image includes `python`, `python3`, `pip`, `pip3`, and `python -m venv` support.
 
-Builds resolve and download Python from `python.org`.
+Python is copied from the official `python:<version>-slim-bookworm` Docker image.
 
 ## Run
 

@@ -114,7 +114,6 @@ async function makeRuntimeFixture(options = {}) {
     pip3 = true,
     pip = true,
     python3VenvSucceeds = true,
-    pythonVersion = '3.12.9',
   } = options;
   const root = await mkdtemp(path.join(tmpdir(), 'verify-runtime-'));
   const workspace = path.join(root, 'workspace');
@@ -171,7 +170,6 @@ async function makeRuntimeFixture(options = {}) {
   await writeFile(path.join(superpowersPluginEntry, 'superpowers.js'), 'export default {}\n');
   await writeFile(path.join(skillsDir, 'using-superpowers/SKILL.md'), '# using-superpowers\n');
   await writeFile(path.join(skillsDir, 'brainstorming/SKILL.md'), '# brainstorming\n');
-  await writeFile(path.join(configDir, 'python-version.txt'), `${pythonVersion}\n`, 'utf8');
   await writeFile(
     metadataPath,
     JSON.stringify(

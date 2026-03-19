@@ -8,7 +8,6 @@ WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
 OPENCODE_CONFIG="${OPENCODE_CONFIG:-/opt/opencode/opencode.json}"
 OPENCODE_CONFIG_DIR="${OPENCODE_CONFIG_DIR:-/opt/opencode}"
 MCP_VERSIONS_FILE="${MCP_VERSIONS_FILE:-/opt/opencode/mcp-versions.json}"
-PYTHON_VERSION_FILE="${PYTHON_VERSION_FILE:-$OPENCODE_CONFIG_DIR/python-version.txt}"
 OPENCODE_SERVER_PORT="${OPENCODE_SERVER_PORT:-4096}"
 OPENCODE_SERVER_HOST="${OPENCODE_SERVER_HOST:-0.0.0.0}"
 OCA_OAUTH_CALLBACK_PORT="${OCA_OAUTH_CALLBACK_PORT:-48801}"
@@ -70,10 +69,6 @@ check_python_runtime() {
 
   python3 --version >/dev/null 2>&1 || fail 'python3 --version failed'
   pip3 --version >/dev/null 2>&1 || fail 'pip3 --version failed'
-
-  if [[ -e "$PYTHON_VERSION_FILE" ]]; then
-    [[ -s "$PYTHON_VERSION_FILE" ]] || fail "Python version file is empty: $PYTHON_VERSION_FILE"
-  fi
 
   venv_dir="$(mktemp -d)"
   python3 -m venv "$venv_dir" >/dev/null 2>&1 || {

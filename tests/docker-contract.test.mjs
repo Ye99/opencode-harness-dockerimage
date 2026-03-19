@@ -36,8 +36,16 @@ test('Dockerfile packages the base template, render helper, and Brave MCP metada
   const dockerfile = await readText('../Dockerfile');
 
   assert.match(dockerfile, /COPY config\/opencode\.json \/opt\/opencode\/opencode\.base\.json/);
-  assert.match(dockerfile, /COPY scripts\/check-mcp-discovery\.mjs \/opt\/opencode\/scripts\/check-mcp-discovery\.mjs/);
-  assert.match(dockerfile, /COPY scripts\/render-opencode-config\.mjs \/opt\/opencode\/scripts\/render-opencode-config\.mjs/);
+
+  const scriptsCopy = dockerfile.match(/COPY [^\n]+ \/opt\/opencode\/scripts\/\n/)?.[0];
+  assert.ok(scriptsCopy, 'expected a combined COPY for scripts');
+  assert.match(scriptsCopy, /check-mcp-discovery\.mjs/);
+  assert.match(scriptsCopy, /render-opencode-config\.mjs/);
+  assert.match(scriptsCopy, /validate-sources-lock\.mjs/);
+  assert.match(scriptsCopy, /verify-runtime\.sh/);
+  assert.match(scriptsCopy, /install-superpowers\.sh/);
+
+  assert.match(dockerfile, /COPY vendor\/ \/opt\/opencode\/vendor\//);
   assert.match(dockerfile, /rm -rf \/var\/lib\/apt\/lists\/\*/);
   assert.match(dockerfile, /mkdir -p \/opt\/opencode/);
   assert.match(dockerfile, /npm install -g [^\n]*opencode-ai@1\.2\.27/);
@@ -318,15 +326,13 @@ test('smoke-mcp-runtime accepts either a timeout hold-open or a Brave startup ba
   assert.match(smokeScript, /if \[\[ "\$status" -ne 124 \]\] && ! grep -Fq 'Brave Search MCP Server running on stdio' \/tmp\/brave-startup\.txt; then/);
 });
 
-test('smoke-mcp-runtime verifies the packaged Python runtime commands and resolved version marker', async () => {
+test('smoke-mcp-runtime verifies the packaged Python runtime commands', async () => {
   const smokeScript = await readText('../scripts/smoke-mcp-runtime.sh');
 
   assert.match(smokeScript, /command -v python3 >\/dev\/null/);
   assert.match(smokeScript, /command -v python >\/dev\/null/);
   assert.match(smokeScript, /command -v pip3 >\/dev\/null/);
   assert.match(smokeScript, /command -v pip >\/dev\/null/);
-  assert.match(smokeScript, /test -f \/opt\/opencode\/python-version\.txt/);
-  assert.match(smokeScript, /resolved_python_version="\$\(tr -d '\\n' <\/opt\/opencode\/python-version\.txt\)"/);
   assert.match(smokeScript, /python3 --version >/);
   assert.match(smokeScript, /python --version >/);
   assert.match(smokeScript, /pip3 --version >/);
@@ -338,7 +344,6 @@ test('smoke-mcp-runtime verifies the packaged Python runtime commands and resolv
   assert.match(smokeScript, /mktemp -d/);
   assert.match(smokeScript, /python3 -m venv "\$venv_root\/python3-venv"/);
   assert.match(smokeScript, /python -m venv "\$venv_root\/python-venv"/);
-  assert.match(smokeScript, /sys\.version\.startswith\(resolved_version\)/);
   assert.match(smokeScript, /sys\.executable/);
 });
 
@@ -364,37 +369,36 @@ test('smoke-mcp-runtime exercises keyed and no-key Brave states with and without
   }
 });
 
-test('Dockerfile builds Python in dedicated resolver and builder stages, then ships only the runtime contract', async () => {
+test('Dockerfile copies Python from official image with build-time smoke gate', async () => {
   const dockerfile = await readText('../Dockerfile');
 
-  assert.match(dockerfile, /^ARG PYTHON_VERSION=latest-stable$/m);
-  assert.match(dockerfile, /^FROM node:22-slim AS python-version-resolver$/m);
-  assert.match(dockerfile, /^FROM node:22-slim AS python-builder$/m);
+  assert.match(dockerfile, /^# syntax=docker\/dockerfile:1$/m);
+  assert.match(dockerfile, /^ARG PYTHON_VERSION=3$/m);
+  assert.match(dockerfile, /^FROM python:\$\{PYTHON_VERSION\}-slim-bookworm AS python-source$/m);
   assert.match(dockerfile, /^FROM node:22-slim$/m);
-  assert.match(dockerfile, /COPY scripts\/resolve-python-version\.mjs \/opt\/opencode\/scripts\/resolve-python-version\.mjs/);
-  assert.match(dockerfile, /COPY scripts\/install-python-runtime\.sh \/opt\/opencode\/scripts\/install-python-runtime\.sh/);
-  assert.match(dockerfile, /COPY scripts\/verify-python-archive\.sh \/opt\/opencode\/scripts\/verify-python-archive\.sh/);
-  assert.match(dockerfile, /\/opt\/opencode\/python-version\.txt/);
-  assert.match(dockerfile, /\/usr\/local\/bin\/python3/);
+  assert.match(dockerfile, /COPY --from=python-source \/usr\/local\/bin\/ \/usr\/local\/bin\//);
+  assert.match(dockerfile, /COPY --from=python-source \/usr\/local\/lib\/ \/usr\/local\/lib\//);
+  assert.match(dockerfile, /--mount=type=bind,from=python-source,source=\/tmp\/python-packages\.txt/);
+  assert.match(dockerfile, /--mount=type=cache,target=\/root\/\.npm/);
+  assert.match(dockerfile, /rm -rf [^\n]*opencode-linux-\*-musl/);
+  assert.match(dockerfile, /COPY --chmod=755 [^\n]*\/usr\/local\/bin\/opencode-harness-entrypoint/);
+  assert.match(dockerfile, /COPY --chmod=755 [^\n]*\/opt\/opencode\/scripts\//);
+  assert.match(dockerfile, /ldconfig/);
+  assert.match(dockerfile, /node --version/);
+  assert.match(dockerfile, /npm --version/);
+  assert.match(dockerfile, /node-core-ok/);
+  assert.match(dockerfile, /python3 --version/);
+  assert.match(dockerfile, /python-stdlib-ok/);
+  assert.match(dockerfile, /pip3 --version/);
   assert.match(dockerfile, /\/usr\/local\/bin\/python\b/);
-  assert.match(dockerfile, /\/usr\/local\/bin\/pip3/);
   assert.match(dockerfile, /\/usr\/local\/bin\/pip\b/);
+  assert.doesNotMatch(dockerfile, /python-version-resolver/);
+  assert.doesNotMatch(dockerfile, /python-builder/);
+  assert.doesNotMatch(dockerfile, /install-python-runtime/);
+  assert.doesNotMatch(dockerfile, /verify-python-archive/);
+  assert.doesNotMatch(dockerfile, /resolve-python-version/);
+  assert.doesNotMatch(dockerfile, /cosign/);
+  assert.doesNotMatch(dockerfile, /\/opt\/python/);
+  assert.doesNotMatch(dockerfile, /python-version\.txt/);
 });
 
-test('Python runtime installer script builds CPython into /opt/python for the final image handoff', async () => {
-  assert.equal(await pathExists('../scripts/install-python-runtime.sh'), true);
-
-  const installer = await readText('../scripts/install-python-runtime.sh');
-
-  assert.match(installer, /PREFIX=\/opt\/python/);
-  assert.match(installer, /Python-\$\{PYTHON_VERSION\}\.tar\.xz/);
-  assert.match(installer, /\.\/configure --prefix="\$PREFIX"/);
-  assert.match(installer, /make -j"\$\(nproc\)"/);
-  assert.match(installer, /make install/);
-  assert.match(installer, /rm -rf "\$PREFIX\/share"/);
-  assert.match(installer, /rm -f "\$PREFIX"\/bin\/2to3\* "\$PREFIX"\/bin\/idle3\* "\$PREFIX"\/bin\/pydoc3\* "\$PREFIX"\/bin\/python3-config "\$PREFIX"\/bin\/python3\.\*-config/);
-  assert.match(installer, /find "\$PREFIX" .*__pycache__.*'\*\.pyc'.*'\*\.pyo'.*-exec rm -rf \{\} \+/);
-  assert.match(installer, /find "\$PREFIX" .*'\*\/test'.*'\*\/tests'.*-exec rm -rf \{\} \+/);
-  assert.match(installer, /find "\$PREFIX" .*'\*\.a'.*'\*\/pkgconfig'.*-exec rm -rf \{\} \+/);
-  assert.match(installer, /find "\$PREFIX" .*'\*\/config-[^']+'.*'\*\/idlelib'.*'\*\/turtledemo'.*-exec rm -rf \{\} \+/);
-});
