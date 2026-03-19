@@ -4,7 +4,7 @@
 
 **Goal:** Add `context7`, `grep_app`, and env-gated `brave-search` MCP support to the Dockerized OpenCode harness, while keeping the Brave API key out of tracked files and proving discovery through runtime and smoke checks.
 
-**Architecture:** Keep `config/opencode.json` as the checked-in base template, copy it into the image as `/opt/opencode/opencode.base.json`, and render `/opt/opencode/opencode.json` at container startup with `scripts/render-opencode-config.mjs`. Extend preflight to use the rendered config as the source of truth for Brave enablement, install `@modelcontextprotocol/server-brave-search@latest` into the image, and add a host-side smoke script that verifies keyed/no-key and online/offline discovery behavior.
+**Architecture:** Keep `config/opencode.json` as the checked-in base template, copy it into the image as `/opt/opencode/opencode.base.json`, and render `/opt/opencode/opencode.json` at container startup with `scripts/render-opencode-config.mjs`. Extend preflight to use the rendered config as the source of truth for Brave enablement, install `@modelcontextprotocol/server-brave-search` (pinned version) into the image, and add a host-side image-verification script that verifies keyed/no-key and online/offline discovery behavior.
 
 **Tech Stack:** Node 22, Bash, Docker, OpenCode `1.2.27`, npm global installs, built-in Node test runner
 
@@ -16,8 +16,8 @@
 - `scripts/render-opencode-config.mjs` — startup-only renderer that reads the base config, toggles `brave-search.enabled`, injects `environment.BRAVE_API_KEY` only when the env var is non-empty, and writes `/opt/opencode/opencode.json`.
 - `scripts/opencode-harness-entrypoint` — runs the render helper before `scripts/verify-runtime.sh` and `opencode web`.
 - `scripts/verify-runtime.sh` — validates packaged assets, Brave binary presence, rendered config state, and `opencode mcp list` discovery behavior.
-- `scripts/smoke-mcp-runtime.sh` — host-side automated smoke runner for keyed/no-key and online/no-egress Docker scenarios.
-- `Dockerfile` — copies the base config to `/opt/opencode/opencode.base.json`, installs `@modelcontextprotocol/server-brave-search@latest`, writes MCP version metadata, and packages the new render helper.
+- `scripts/verify-image.sh` — host-side automated image verification runner for keyed/no-key and online/no-egress Docker scenarios.
+- `Dockerfile` — copies the base config to `/opt/opencode/opencode.base.json`, installs `@modelcontextprotocol/server-brave-search` (pinned), writes MCP version metadata, and packages the new render helper.
 - `README.md` — documents `BRAVE_API_KEY` setup, `docker run -e BRAVE_API_KEY`, `opencode mcp list`, and the disabled-without-key behavior.
 - `tests/render-opencode-config.test.mjs` — unit tests for keyed/no-key render behavior and preservation of `context7` / `grep_app`.
 - `tests/verify-runtime.test.mjs` — fixture-driven preflight tests for MCP discovery success/failure states.
@@ -288,7 +288,7 @@ test('Dockerfile copies the immutable base config, packages the render helper, a
   const dockerfile = await readFile(new URL('../Dockerfile', import.meta.url), 'utf8');
   assert.match(dockerfile, /COPY config\/opencode\.json \/opt\/opencode\/opencode\.base\.json/);
   assert.match(dockerfile, /COPY scripts\/render-opencode-config\.mjs \/opt\/opencode\/scripts\/render-opencode-config\.mjs/);
-  assert.match(dockerfile, /npm install -g opencode-ai@1\.2\.27 @modelcontextprotocol\/server-brave-search@latest/);
+  assert.match(dockerfile, /npm install -g opencode-ai@1\.2\.27 @modelcontextprotocol\/server-brave-search@\d+\.\d+\.\d+/);
   assert.match(dockerfile, /mcp-versions\.json/);
   assert.match(dockerfile, /npm ls -g @modelcontextprotocol\/server-brave-search --json --depth=0 > \/opt\/opencode\/mcp-versions\.json/);
 });
@@ -315,7 +315,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends bash ca-certificates curl git \
   && rm -rf /var/lib/apt/lists/* \
   && mkdir -p /opt/opencode/scripts \
-  && npm install -g opencode-ai@1.2.27 @modelcontextprotocol/server-brave-search@latest \
+  && npm install -g opencode-ai@1.2.27 @modelcontextprotocol/server-brave-search@0.6.2 \
   && npm ls -g @modelcontextprotocol/server-brave-search --json --depth=0 > /opt/opencode/mcp-versions.json
 
 COPY config/opencode.json /opt/opencode/opencode.base.json
@@ -691,14 +691,14 @@ git commit -m "test: verify MCP discovery during preflight"
 ### Task 4: Add an automated Docker smoke script for keyed/no-key and online/offline states
 
 **Files:**
-- Create: `scripts/smoke-mcp-runtime.sh`
+- Create: `scripts/verify-image.sh`
 - Modify: `tests/docker-contract.test.mjs`
 
 - [ ] **Step 1: Add failing contract tests for the smoke script coverage**
 
 ```js
-test('smoke-mcp-runtime script covers keyed, no-key, and no-egress states', async () => {
-  const smoke = await readFile(new URL('../scripts/smoke-mcp-runtime.sh', import.meta.url), 'utf8');
+test('verify-image script covers keyed, no-key, and no-egress states', async () => {
+  const smoke = await readFile(new URL('../scripts/verify-image.sh', import.meta.url), 'utf8');
   assert.match(smoke, /BRAVE_API_KEY=dummy-brave-key/);
   assert.match(smoke, /--network none/);
   assert.match(smoke, /command -v mcp-server-brave-search/);
@@ -798,14 +798,14 @@ Expected: PASS
 
 - [ ] **Step 5: Run the smoke script itself**
 
-Run: `bash scripts/smoke-mcp-runtime.sh`
+Run: `bash scripts/verify-image.sh`
 Expected: PASS; the script exits 0 after checking keyed/no-key and online/no-egress discovery behavior
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add scripts/smoke-mcp-runtime.sh tests/docker-contract.test.mjs
-git commit -m "test: add MCP docker smoke coverage"
+git add scripts/verify-image.sh tests/docker-contract.test.mjs
+git commit -m "test: add MCP docker image verification coverage"
 ```
 
 ### Task 5: Document the Brave env workflow and update host shell setup
@@ -871,7 +871,7 @@ This is a manual host-only step. Do not write the real Brave key into any repo f
 
 - [ ] **Step 6: Run the full repo tests and smoke script**
 
-Run: `npm test && bash scripts/smoke-mcp-runtime.sh`
+Run: `npm test && bash scripts/verify-image.sh`
 Expected: PASS; the smoke script covers keyed/no-key and online/no-egress states and exits 0 only when the rendered Brave config assertions hold for each run
 
 - [ ] **Step 7: Run the explicit manual validation matrix from the spec**
@@ -911,8 +911,8 @@ Expected: keyed runs show `enabled: true` and `hasKey: true`; no-key runs show `
 - [ ] **Step 8: Commit the repo changes**
 
 ```bash
-git add README.md tests/docker-contract.test.mjs scripts/smoke-mcp-runtime.sh
-git commit -m "docs: explain MCP env and smoke workflow"
+git add README.md tests/docker-contract.test.mjs scripts/verify-image.sh
+git commit -m "docs: explain MCP env and image verification workflow"
 ```
 
 - [ ] **Step 9: Run the manual secret-removal check**

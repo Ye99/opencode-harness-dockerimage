@@ -74,13 +74,13 @@ Python needs `libexpat1` (XML parsing) which may not be in `node:22-slim`. Verif
 
 - Rewrite test `'Dockerfile builds Python in dedicated resolver and builder stages...'` to assert the new `COPY --from=python-source` pattern and `ARG PYTHON_VERSION=3`.
 - Delete test `'Python runtime installer script builds CPython into /opt/python...'` — the installer script no longer exists.
-- Update test `'smoke-mcp-runtime verifies the packaged Python runtime commands and resolved version marker'` — remove assertions for `python-version.txt`, `resolved_python_version`, and `sys.version.startswith(resolved_version)` to match the updated smoke script.
+- Update test `'verify-image verifies the packaged Python runtime commands and resolved version marker'` — remove assertions for `python-version.txt`, `resolved_python_version`, and `sys.version.startswith(resolved_version)` to match the updated verify-image script.
 
 ### `tests/verify-runtime.test.mjs`
 
 - Remove `pythonVersion` option and `python-version.txt` file creation from `makeRuntimeFixture`.
 
-### `scripts/smoke-mcp-runtime.sh`
+### `scripts/verify-image.sh`
 
 - Remove `test -f /opt/opencode/python-version.txt` and `resolved_python_version` lines.
 - Remove `sys.version.startswith(resolved_version)` assertions from the Python heredoc blocks.

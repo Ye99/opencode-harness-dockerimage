@@ -16,7 +16,7 @@
 |---|---|---|
 | `Dockerfile` | Modify | Replace 3 stages with 2, add smoke gate |
 | `scripts/verify-runtime.sh` | Modify | Remove python-version.txt references |
-| `scripts/smoke-mcp-runtime.sh` | Modify | Remove version-marker assertions |
+| `scripts/verify-image.sh` | Modify | Remove version-marker assertions |
 | `tests/docker-contract.test.mjs` | Modify | Update Dockerfile assertions, delete installer test |
 | `tests/verify-runtime.test.mjs` | Modify | Remove pythonVersion/version-file from fixture |
 | `scripts/resolve-python-version.mjs` | Delete | No longer needed |
@@ -66,7 +66,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends bash ca-certificates curl git \
   && rm -rf /var/lib/apt/lists/* \
   && mkdir -p /opt/opencode \
-  && npm install -g opencode-ai@1.2.27 @modelcontextprotocol/server-brave-search@latest \
+  && npm install -g opencode-ai@1.2.27 @modelcontextprotocol/server-brave-search@0.6.2 \
   && npm ls -g @modelcontextprotocol/server-brave-search --json --depth=0 > /opt/opencode/mcp-versions.json
 
 WORKDIR /opt/opencode
@@ -209,7 +209,7 @@ Docker tag at build time."
 
 **Files:**
 - Modify: `tests/docker-contract.test.mjs:367-400` (rewrite Python Dockerfile test, delete installer test)
-- Modify: `tests/docker-contract.test.mjs:321-343` (update smoke-mcp-runtime Python assertions test)
+- Modify: `tests/docker-contract.test.mjs:321-343` (update verify-image Python assertions test)
 
 - [ ] **Step 1: Rewrite the Dockerfile Python stage test**
 
@@ -248,9 +248,9 @@ test('Dockerfile copies Python from official image with build-time smoke gate', 
 
 Delete the test `'Python runtime installer script builds CPython into /opt/python for the final image handoff'` (lines 384-400) entirely.
 
-- [ ] **Step 3: Update the smoke-mcp-runtime Python assertions test**
+- [ ] **Step 3: Update the verify-image Python assertions test**
 
-In the test `'smoke-mcp-runtime verifies the packaged Python runtime commands and resolved version marker'` (lines 321-343):
+In the test `'verify-image verifies the packaged Python runtime commands and resolved version marker'` (lines 321-343):
 
 Remove these assertions:
 ```javascript
@@ -259,7 +259,7 @@ Remove these assertions:
   assert.match(smokeScript, /sys\.version\.startswith\(resolved_version\)/);
 ```
 
-Rename the test to `'smoke-mcp-runtime verifies the packaged Python runtime commands'` (drop "and resolved version marker").
+Rename the test to `'verify-image verifies the packaged Python runtime commands'` (drop "and resolved version marker").
 
 Keep all remaining assertions in the test unchanged.
 
@@ -314,10 +314,10 @@ The version marker file no longer exists in the image."
 
 ---
 
-### Task 6: Update scripts/smoke-mcp-runtime.sh
+### Task 6: Update scripts/verify-image.sh
 
 **Files:**
-- Modify: `scripts/smoke-mcp-runtime.sh` (inside the `exec_checks` heredoc)
+- Modify: `scripts/verify-image.sh` (inside the `exec_checks` heredoc)
 
 - [ ] **Step 1: Remove version-marker lines from exec_checks**
 
@@ -356,21 +356,21 @@ Do the same for the `python - <<'PY'` block.
 
 - [ ] **Step 3: Verify the script is syntactically valid**
 
-Run: `bash -n scripts/smoke-mcp-runtime.sh`
+Run: `bash -n scripts/verify-image.sh`
 
 Expected: Exit 0, no output.
 
-- [ ] **Step 4: Run the contract test that asserts smoke script content**
+- [ ] **Step 4: Run the contract test that asserts verify-image script content**
 
 Run: `node --test tests/docker-contract.test.mjs`
 
-Expected: All tests PASS (including the updated smoke-mcp-runtime assertion test from Task 4).
+Expected: All tests PASS (including the updated verify-image assertion test from Task 4).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/smoke-mcp-runtime.sh
-git commit -m "Remove python-version.txt assertions from smoke test
+git add scripts/verify-image.sh
+git commit -m "Remove python-version.txt assertions from verify-image script
 
 Version is controlled by Docker tag, not a marker file. Keep all other
 Python runtime checks (version, pip, venv, sys.executable)."
@@ -388,7 +388,7 @@ Expected: All tests PASS. No test file references deleted scripts or missing fil
 
 - [ ] **Step 2: Verify no dangling references to deleted files**
 
-Run: `grep -r 'resolve-python-version\|install-python-runtime\|verify-python-archive\|python-version\.txt' --include='*.mjs' --include='*.sh' --include='Dockerfile' .`
+Run: `rg 'resolve-python-version|install-python-runtime|verify-python-archive|python-version\.txt' --glob='*.mjs' --glob='*.sh' --glob='Dockerfile' .`
 
 Expected: No matches (or only matches in `docs/` which are documentation, not code).
 

@@ -26,7 +26,7 @@
   - Copy runtime into final `node:22-slim` image
 - Modify: `scripts/verify-runtime.sh`
   - Add Python runtime and `venv` checks
-- Modify: `scripts/smoke-mcp-runtime.sh`
+- Modify: `scripts/verify-image.sh`
   - Verify packaged Python runtime in real containers
 - Modify: `tests/docker-contract.test.mjs`
   - Assert Dockerfile/python contract and script wiring
@@ -203,7 +203,7 @@ git commit -m "feat: add multi-stage Python runtime build"
 **Files:**
 - Modify: `scripts/verify-runtime.sh`
 - Modify: `tests/verify-runtime.test.mjs`
-- Modify: `scripts/smoke-mcp-runtime.sh`
+- Modify: `scripts/verify-image.sh`
 
 - [ ] **Step 1: Write failing fixture-based tests for Python checks**
 
@@ -242,7 +242,7 @@ Expected: FAIL because Python checks are not implemented yet
   - if `/opt/opencode/python-version.txt` exists, verify it is non-empty
 
 - [ ] **Step 4: Update smoke coverage**
-  - in `scripts/smoke-mcp-runtime.sh`, add container checks for:
+  - in `scripts/verify-image.sh`, add container checks for:
     - `python3 --version`
     - `python --version`
     - `pip3 --version`
@@ -258,7 +258,7 @@ Expected: PASS
 - [ ] **Step 6: Commit**
 
 ```bash
-git add scripts/verify-runtime.sh scripts/smoke-mcp-runtime.sh tests/verify-runtime.test.mjs
+git add scripts/verify-runtime.sh scripts/verify-image.sh tests/verify-runtime.test.mjs
 git commit -m "test: verify packaged Python runtime"
 ```
 
@@ -298,7 +298,7 @@ Expected: PASS
 
 - [ ] **Step 5: Run the packaged smoke script**
 
-Run: `IMAGE_TAG=opencode-harness scripts/smoke-mcp-runtime.sh`  
+Run: `IMAGE_TAG=opencode-harness scripts/verify-image.sh`  
 Expected: PASS with current MCP/Brave checks plus Python runtime checks
 
 - [ ] **Step 6: Verify explicit version override once**

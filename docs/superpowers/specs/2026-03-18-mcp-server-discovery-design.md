@@ -7,7 +7,7 @@ Add the MCP servers `context7`, `grep_app`, and `brave-search` to the OpenCode h
 Versioning policy for these MCP integrations:
 
 - remote MCPs should track their canonical upstream service URLs without repo-level version pinning
-- local npm-installed MCP packages should use npm's `@latest` dist-tag rather than a hardcoded version
+- local npm-installed MCP packages should be pinned to a specific version for reproducible builds; the pinned version should be updated deliberately when an upgrade is needed
 
 For the remote MCPs in this repo, the guaranteed scope is static discovery from the configured canonical URLs. This spec does not promise ongoing compatibility with arbitrary upstream protocol changes beyond successful OpenCode discovery/listing behavior on the pinned harness runtime.
 
@@ -63,7 +63,7 @@ Because the Brave server should be disabled when the key is missing, `config/ope
 
 The container runtime should receive the key through `docker run -e BRAVE_API_KEY` or equivalent environment pass-through. The image itself must not contain the secret.
 
-To keep Brave discovery from depending on a live npm package download, the Docker image should install `@modelcontextprotocol/server-brave-search@latest` during build with global npm installation so the binary `mcp-server-brave-search` is available in the image `PATH`. Build the image with fresh package metadata, record the actually installed Brave package version into an image-managed metadata file during the same build, and use that recorded installed version as the verification source of truth. The rendered config should invoke that installed binary directly, so `opencode mcp list` cannot trigger a package download.
+To keep Brave discovery from depending on a live npm package download, the Docker image should install `@modelcontextprotocol/server-brave-search` (pinned version) during build with global npm installation so the binary `mcp-server-brave-search` is available in the image `PATH`. Build the image with fresh package metadata, record the actually installed Brave package version into an image-managed metadata file during the same build, and use that recorded installed version as the verification source of truth. The rendered config should invoke that installed binary directly, so `opencode mcp list` cannot trigger a package download.
 
 ### Docker And Entrypoint Behavior
 
@@ -127,12 +127,12 @@ Update repo tests to cover these behaviors:
 7. `scripts/verify-runtime.sh` checks `command -v mcp-server-brave-search`, runs `opencode mcp list`, and drives Brave expectations from rendered `brave-search.enabled` rather than raw env presence or loose substring checks
 8. `scripts/verify-runtime.sh` fails if `context7` or `grep_app` are missing from `opencode mcp list`
 9. `scripts/verify-runtime.sh` fails if rendered `brave-search.enabled` is `true` but `brave-search` is missing from `opencode mcp list`
-10. Docker/manual validation confirms the built image installed `@modelcontextprotocol/server-brave-search@latest`, records the actually installed Brave package version in image-managed metadata, and does not require npm to download it on demand at runtime
+10. Docker/manual validation confirms the built image installed the pinned `@modelcontextprotocol/server-brave-search` version, records the actually installed Brave package version in image-managed metadata, and does not require npm to download it on demand at runtime
 11. validation includes a manual external-input repo scan confirming the previously provided Brave key string does not remain in tracked repo files or Docker build inputs
 
 This matches the existing repo pattern of contract tests for static config and preflight behavior without requiring Docker or live network access in `npm test`. The latest-release check belongs to Docker/manual validation, not repo unit tests.
 
-In addition to `npm test`, add a dedicated automated Docker smoke script suitable for CI or repeated local verification. That smoke path should build the image from fresh package metadata and fail if the current `@latest` Brave package no longer provides `mcp-server-brave-search`, no longer starts with only `BRAVE_API_KEY`, or no longer works with the pinned `opencode-ai@1.2.27` discovery flow.
+In addition to `npm test`, add a dedicated automated Docker image verification script (`scripts/verify-image.sh`) suitable for CI or repeated local verification. That verification path should build the image from fresh package metadata and fail if the pinned Brave package no longer provides `mcp-server-brave-search`, no longer starts with only `BRAVE_API_KEY`, or no longer works with the pinned `opencode-ai@1.2.27` discovery flow.
 
 Automation contract for that smoke script:
 
