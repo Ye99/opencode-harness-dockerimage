@@ -21,7 +21,7 @@ test('--mcp-metadata without any values exits with error mentioning missing valu
   });
 
   assert.notEqual(result.code, 0, 'should exit non-zero');
-  assert.match(result.stderr, /Missing value for --mcp-metadata/i);
+  assert.match(result.stderr, /Missing value for --mcp-metadata: expected <file> <package>/i);
 });
 
 test('--mcp-metadata with only one value (missing package name) exits with error', async () => {
@@ -30,7 +30,7 @@ test('--mcp-metadata with only one value (missing package name) exits with error
   });
 
   assert.notEqual(result.code, 0, 'should exit non-zero');
-  assert.match(result.stderr, /Missing value for --mcp-metadata/i);
+  assert.match(result.stderr, /Missing package name for --mcp-metadata/i);
 });
 
 test('--config without a value exits with error mentioning missing value', async () => {

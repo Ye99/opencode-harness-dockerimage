@@ -1,3 +1,4 @@
 .git/
 .opencode-state/
 node_modules/
+vendor/*/tests/

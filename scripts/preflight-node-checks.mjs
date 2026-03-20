@@ -58,12 +58,12 @@ for (let i = 0; i < args.length; i += 1) {
       break;
     case '--mcp-metadata':
       if (++i >= args.length) {
-        errors.push('Missing value for --mcp-metadata');
+        errors.push('Missing value for --mcp-metadata: expected <file> <package>');
         break;
       }
       mcpFile = args[i];
       if (++i >= args.length) {
-        errors.push('Missing value for --mcp-metadata');
+        errors.push('Missing package name for --mcp-metadata: expected <file> <package>');
         break;
       }
       mcpPackage = args[i];
