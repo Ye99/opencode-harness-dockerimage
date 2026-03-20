@@ -362,13 +362,20 @@ test('verify-image exercises keyed and no-key Brave states with and without egre
   }
 });
 
+test('entrypoint documents the env-defaults rationale, probe_host mapping, and auth polling interval', async () => {
+  const entrypoint = await readText('../scripts/opencode-harness-entrypoint');
+  assert.match(entrypoint, /Defaults are repeated here so the entrypoint also works outside Docker/);
+  assert.match(entrypoint, /loopback address/);
+  assert.match(entrypoint, /Poll auth file every 2s/);
+});
+
 test('Dockerfile copies Python from official image with build-time smoke gate', async () => {
   const dockerfile = await readText('../Dockerfile');
 
   assert.match(dockerfile, /^# syntax=docker\/dockerfile:1$/m);
-  assert.match(dockerfile, /^ARG PYTHON_VERSION=3$/m);
+  assert.match(dockerfile, /^ARG PYTHON_VERSION=3\.13$/m);
   assert.match(dockerfile, /^FROM python:\$\{PYTHON_VERSION\}-slim-bookworm AS python-source$/m);
-  assert.match(dockerfile, /^FROM node:22-slim$/m);
+  assert.match(dockerfile, /^FROM node:22\.16-slim$/m);
   assert.match(dockerfile, /COPY --from=python-source \/usr\/local\/bin\/ \/usr\/local\/bin\//);
   assert.match(dockerfile, /COPY --from=python-source \/usr\/local\/lib\/ \/usr\/local\/lib\//);
   assert.match(dockerfile, /--mount=type=bind,from=python-source,source=\/tmp\/python-packages\.txt/);
@@ -393,5 +400,11 @@ test('Dockerfile copies Python from official image with build-time smoke gate', 
   assert.doesNotMatch(dockerfile, /cosign/);
   assert.doesNotMatch(dockerfile, /\/opt\/python/);
   assert.doesNotMatch(dockerfile, /python-version\.txt/);
+});
+
+test('Dockerfile documents BROWSER=/bin/true rationale with an inline comment', async () => {
+  const dockerfile = await readText('../Dockerfile');
+  assert.match(dockerfile, /# Suppress browser-open attempts in headless container/);
+  assert.match(dockerfile, /BROWSER=\/bin\/true/);
 });
 

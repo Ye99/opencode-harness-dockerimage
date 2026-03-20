@@ -50,14 +50,30 @@ let configPath = '';
 for (let i = 0; i < args.length; i += 1) {
   switch (args[i]) {
     case '--check-port':
-      ports.push(args[++i]);
+      if (++i >= args.length) {
+        errors.push('Missing value for --check-port');
+        break;
+      }
+      ports.push(args[i]);
       break;
     case '--mcp-metadata':
-      mcpFile = args[++i];
-      mcpPackage = args[++i];
+      if (++i >= args.length) {
+        errors.push('Missing value for --mcp-metadata');
+        break;
+      }
+      mcpFile = args[i];
+      if (++i >= args.length) {
+        errors.push('Missing value for --mcp-metadata');
+        break;
+      }
+      mcpPackage = args[i];
       break;
     case '--config':
-      configPath = args[++i];
+      if (++i >= args.length) {
+        errors.push('Missing value for --config');
+        break;
+      }
+      configPath = args[i];
       break;
   }
 }

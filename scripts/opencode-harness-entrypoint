@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+# Export env vars with defaults matching Dockerfile ENV declarations.
+# Defaults are repeated here so the entrypoint also works outside Docker (e.g., in tests).
 export OPENCODE_CONFIG="${OPENCODE_CONFIG:-/opt/opencode/opencode.json}"
 export OPENCODE_CONFIG_DIR="${OPENCODE_CONFIG_DIR:-/opt/opencode}"
 export OPENCODE_SERVER_PORT="${OPENCODE_SERVER_PORT:-4096}"
@@ -20,6 +22,9 @@ auth_signature() {
   printf 'missing\n'
 }
 
+# Map wildcard bind addresses to their loopback equivalents for local probing.
+# When the server binds to all interfaces (0.0.0.0 or ::), we probe the
+# loopback address instead, since we only need to verify the port is reachable locally.
 probe_host() {
   case "$OPENCODE_SERVER_HOST" in
     0.0.0.0) printf '127.0.0.1\n' ;;
@@ -69,6 +74,8 @@ while true; do
   child_pid="$!"
 
   while kill -0 "$child_pid" 2>/dev/null; do
+    # Poll auth file every 2s; inotify would be more responsive but adds
+    # complexity that is not justified for infrequent auth changes.
     sleep 2
     current_auth_signature="$(auth_signature)"
     if [[ "$current_auth_signature" != "$previous_auth_signature" ]]; then
