@@ -402,6 +402,24 @@ test('Dockerfile copies Python from official image with build-time smoke gate', 
   assert.doesNotMatch(dockerfile, /python-version\.txt/);
 });
 
+test('Dockerfile prunes vendor test and non-runtime files from plugins in the same layer', async () => {
+  const dockerfile = await readText('../Dockerfile');
+
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/opencode-oca-auth\/test\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/opencode-oca-auth\/docs\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/opencode-oca-auth\/CLAUDE\.md\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/opencode-oca-auth\/bun\.lock\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/opencode-oca-auth\/tsconfig\.json\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/tests\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/\.github\b/);
+
+  // Cleanup must be in the same RUN layer as the vendor bind-mount copy
+  const vendorRunLayer = dockerfile.match(/RUN --mount=type=bind,source=vendor[\s\S]*?(?=\n\n|\nWORKDIR|\nCOPY|\nFROM|\nEXPOSE|\nENTRYPOINT|\nCMD|$)/)?.[0];
+  assert.ok(vendorRunLayer, 'expected a RUN layer with vendor bind-mount');
+  assert.match(vendorRunLayer, /rm -rf/);
+  assert.match(vendorRunLayer, /install-superpowers\.sh/);
+});
+
 test('.dockerignore excludes both vendor/*/tests/ (plural) and vendor/*/test/ (singular)', async () => {
   const dockerignore = await readText('../.dockerignore');
   assert.match(dockerignore, /^vendor\/\*\/tests\/$/m, 'expected vendor/*/tests/ pattern');

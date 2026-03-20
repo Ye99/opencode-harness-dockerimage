@@ -12,7 +12,7 @@ declare -a CONTAINERS=()
 cleanup() {
   local container_name
 
-  for container_name in "${CONTAINERS[@]:-}"; do
+  for container_name in "${CONTAINERS[@]+"${CONTAINERS[@]}"}"; do
     docker rm -f "$container_name" >/dev/null 2>&1 || true
   done
 }
@@ -226,13 +226,7 @@ main() {
   local -a state_pids=()
   local -a state_names=()
 
-  for state_spec in \
-    'keyed-online bridge true' \
-    'no-key-online bridge false' \
-    'keyed-no-egress none true' \
-    'no-key-no-egress none false' \
-  ; do
-    name="${state_spec%% *}"
+  for name in keyed-online no-key-online keyed-no-egress no-key-no-egress; do
     CONTAINERS+=("verify-image-${name}-$$")
   done
 

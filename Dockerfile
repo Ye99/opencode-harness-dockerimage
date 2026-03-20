@@ -47,7 +47,14 @@ RUN --mount=type=bind,source=vendor,target=/tmp/vendor \
   && node /opt/opencode/scripts/validate-sources-lock.mjs /tmp/vendor/sources.lock.json /tmp/vendor/opencode-oca-auth /tmp/vendor/superpowers \
   && mkdir -p /opt/opencode/plugins \
   && cp -R /tmp/vendor/opencode-oca-auth /opt/opencode/plugins/opencode-oca-auth \
-  && /opt/opencode/scripts/install-superpowers.sh /tmp/vendor/superpowers /opt/opencode
+  && /opt/opencode/scripts/install-superpowers.sh /tmp/vendor/superpowers /opt/opencode \
+  && rm -rf /opt/opencode/plugins/opencode-oca-auth/test \
+            /opt/opencode/plugins/opencode-oca-auth/docs \
+            /opt/opencode/plugins/opencode-oca-auth/CLAUDE.md \
+            /opt/opencode/plugins/opencode-oca-auth/bun.lock \
+            /opt/opencode/plugins/opencode-oca-auth/tsconfig.json \
+            /opt/opencode/plugins/superpowers/tests \
+            /opt/opencode/plugins/superpowers/.github
 
 WORKDIR /workspace
 
