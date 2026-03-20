@@ -412,6 +412,14 @@ test('Dockerfile prunes vendor test and non-runtime files from plugins in the sa
   assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/opencode-oca-auth\/tsconfig\.json\b/);
   assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/tests\b/);
   assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/\.github\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/docs\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/agents\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/commands\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/hooks\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/RELEASE-NOTES\.md\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/CHANGELOG\.md\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/GEMINI\.md\b/);
+  assert.match(dockerfile, /rm -rf[\s\S]*\/opt\/opencode\/plugins\/superpowers\/gemini-extension\.json\b/);
 
   // Cleanup must be in the same RUN layer as the vendor bind-mount copy
   const vendorRunLayer = dockerfile.match(/RUN --mount=type=bind,source=vendor[\s\S]*?(?=\n\n|\nWORKDIR|\nCOPY|\nFROM|\nEXPOSE|\nENTRYPOINT|\nCMD|$)/)?.[0];

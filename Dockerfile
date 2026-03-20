@@ -54,7 +54,15 @@ RUN --mount=type=bind,source=vendor,target=/tmp/vendor \
             /opt/opencode/plugins/opencode-oca-auth/bun.lock \
             /opt/opencode/plugins/opencode-oca-auth/tsconfig.json \
             /opt/opencode/plugins/superpowers/tests \
-            /opt/opencode/plugins/superpowers/.github
+            /opt/opencode/plugins/superpowers/.github \
+            /opt/opencode/plugins/superpowers/docs \
+            /opt/opencode/plugins/superpowers/agents \
+            /opt/opencode/plugins/superpowers/commands \
+            /opt/opencode/plugins/superpowers/hooks \
+            /opt/opencode/plugins/superpowers/RELEASE-NOTES.md \
+            /opt/opencode/plugins/superpowers/CHANGELOG.md \
+            /opt/opencode/plugins/superpowers/GEMINI.md \
+            /opt/opencode/plugins/superpowers/gemini-extension.json
 
 WORKDIR /workspace
 
