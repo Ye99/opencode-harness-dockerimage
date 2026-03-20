@@ -402,6 +402,12 @@ test('Dockerfile copies Python from official image with build-time smoke gate', 
   assert.doesNotMatch(dockerfile, /python-version\.txt/);
 });
 
+test('.dockerignore excludes both vendor/*/tests/ (plural) and vendor/*/test/ (singular)', async () => {
+  const dockerignore = await readText('../.dockerignore');
+  assert.match(dockerignore, /^vendor\/\*\/tests\/$/m, 'expected vendor/*/tests/ pattern');
+  assert.match(dockerignore, /^vendor\/\*\/test\/$/m, 'expected vendor/*/test/ pattern');
+});
+
 test('Dockerfile documents BROWSER=/bin/true rationale with an inline comment', async () => {
   const dockerfile = await readText('../Dockerfile');
   assert.match(dockerfile, /# Suppress browser-open attempts in headless container/);

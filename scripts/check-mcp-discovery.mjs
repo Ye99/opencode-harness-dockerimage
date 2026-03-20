@@ -1,7 +1,7 @@
 import { pathToFileURL } from 'node:url';
 
 const ANSI_PATTERN = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
-const MCP_ROW_PATTERN = /^(?:[●*+-]\s+)?(?:([✓○✗x!])\s+)?([a-z0-9_-]+)(?:\s+\(?(.*?)\)?)?$/i;
+const MCP_ROW_PATTERN = /^(?:[●*+\-]\s+)?(?:([✓○✗x!])\s+)?([a-z0-9_-]+)(?:\s+\(?(.*?)\)?)?$/i;
 const DISABLED_STATUS_PATTERN = /\bdisabled\b/i;
 
 export function stripAnsi(text) {

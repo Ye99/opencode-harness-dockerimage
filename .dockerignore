@@ -2,3 +2,4 @@
 .opencode-state/
 node_modules/
 vendor/*/tests/
+vendor/*/test/

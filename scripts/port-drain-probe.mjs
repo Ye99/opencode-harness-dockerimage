@@ -24,10 +24,22 @@ let attempts = 0;
 function probe() {
   const socket = net.connect({ host, port });
 
+  socket.setTimeout(1000);
+
+  socket.once('timeout', () => {
+    socket.destroy();
+
+    if (++attempts >= MAX_PROBE_ATTEMPTS) {
+      process.exit(1);
+    }
+
+    setTimeout(probe, PROBE_INTERVAL_MS);
+  });
+
   socket.once('connect', () => {
     socket.destroy();
 
-    if (++attempts > MAX_PROBE_ATTEMPTS) {
+    if (++attempts >= MAX_PROBE_ATTEMPTS) {
       process.exit(1);
     }
 

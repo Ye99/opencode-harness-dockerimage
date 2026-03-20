@@ -91,6 +91,11 @@ test('getMcpDiscoveryState keeps exact matching and ignores near-matches', () =>
   assert.equal(getMcpDiscoveryState(output, 'brave-search'), 'missing');
 });
 
+test('getMcpDiscoveryState rejects comma-prefixed lines (comma is not a valid bullet)', () => {
+  const output = ', fake-server connected\n';
+  assert.equal(getMcpDiscoveryState(output, 'fake-server'), 'missing');
+});
+
 test('assertMcpDiscovery distinguishes disabled-or-omitted Brave from enabled Brave', () => {
   assert.doesNotThrow(() => {
     assertMcpDiscovery(formattedOutput, {

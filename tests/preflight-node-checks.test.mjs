@@ -41,3 +41,21 @@ test('--config without a value exits with error mentioning missing value', async
   assert.notEqual(result.code, 0, 'should exit non-zero');
   assert.match(result.stderr, /Missing value for --config/i);
 });
+
+test('--check-port with IPv6 wildcard :::0 succeeds (port 0 binds to any available port)', async () => {
+  const result = await run(process.execPath, [script, '--check-port', ':::0'], {
+    cwd: projectRoot,
+  });
+
+  assert.equal(result.code, 0, 'should exit zero — port 0 on IPv6 wildcard is always available');
+  assert.doesNotMatch(result.stderr, /port is unavailable/i);
+});
+
+test('--check-port with IPv4 0.0.0.0:0 succeeds (port 0 binds to any available port)', async () => {
+  const result = await run(process.execPath, [script, '--check-port', '0.0.0.0:0'], {
+    cwd: projectRoot,
+  });
+
+  assert.equal(result.code, 0, 'should exit zero — port 0 on IPv4 wildcard is always available');
+  assert.doesNotMatch(result.stderr, /port is unavailable/i);
+});

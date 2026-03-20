@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 const errors = [];
 
 function checkPort(hostPort) {
-  const [host, portStr] = hostPort.split(':');
+  const lastColon = hostPort.lastIndexOf(':');
+  const host = hostPort.slice(0, lastColon);
+  const portStr = hostPort.slice(lastColon + 1);
   const port = Number(portStr);
 
   return new Promise((resolve) => {
