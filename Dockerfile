@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 
-ARG PYTHON_VERSION=3.13
+ARG PYTHON_VERSION=3
 FROM python:${PYTHON_VERSION}-slim-bookworm AS python-source
 RUN dpkg-query -W -f='${Package}\n' > /tmp/python-packages.txt
 
-FROM node:22.16-slim
+FROM node:22-slim
 
 ENV OPENCODE_CONFIG=/opt/opencode/opencode.json \
     OPENCODE_PERMISSION_JSON= \
