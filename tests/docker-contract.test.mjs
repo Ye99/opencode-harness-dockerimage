@@ -38,7 +38,7 @@ test('Dockerfile packages the base template, render helper, and Brave MCP metada
   assert.match(scriptsCopy, /port-drain-probe\.mjs/);
   assert.match(scriptsCopy, /preflight-node-checks\.mjs/);
 
-  assert.match(dockerfile, /COPY vendor\/ \/opt\/opencode\/vendor\//);
+  assert.match(dockerfile, /--mount=type=bind,source=vendor,target=\/tmp\/vendor/);
   assert.match(dockerfile, /rm -rf \/var\/lib\/apt\/lists\/\*/);
   assert.match(dockerfile, /mkdir -p \/opt\/opencode/);
   assert.match(dockerfile, /npm install -g [^\n]*opencode-ai@1\.2\.27/);

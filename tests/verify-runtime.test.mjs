@@ -557,10 +557,15 @@ test('verify-runtime preflight fails when workspace is missing', async () => {
 test('verify-runtime preflight fails when workspace is read-only', async () => {
   const fixture = await makeRuntimeFixture();
   await chmod(fixture.workspace, 0o555);
-  const result = await runPreflight(fixture);
 
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /not writable/);
+  try {
+    const result = await runPreflight(fixture);
+
+    assert.notEqual(result.code, 0);
+    assert.match(result.stderr, /not writable/);
+  } finally {
+    await chmod(fixture.workspace, 0o755);
+  }
 });
 
 test('verify-runtime preflight fails when a required port is unavailable', async () => {

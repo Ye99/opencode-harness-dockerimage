@@ -213,7 +213,8 @@ run_state() {
 
   docker_args+=("$IMAGE_TAG")
 
-  CONTAINERS+=("$container_name")
+  # Container registration is done in the parent main() loop, not here.
+  # run_state() executes in a subshell (via &), so array mutations would be lost.
   docker "${docker_args[@]}" >/dev/null
   wait_for_running_container "$container_name"
   exec_checks "$container_name"
@@ -231,7 +232,7 @@ main() {
     'keyed-no-egress none true' \
     'no-key-no-egress none false' \
   ; do
-    read -r name network key <<<"$state_spec"
+    name="${state_spec%% *}"
     CONTAINERS+=("verify-image-${name}-$$")
   done
 

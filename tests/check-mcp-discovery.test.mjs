@@ -96,6 +96,12 @@ test('getMcpDiscoveryState rejects comma-prefixed lines (comma is not a valid bu
   assert.equal(getMcpDiscoveryState(output, 'fake-server'), 'missing');
 });
 
+test('getMcpDiscoveryState handles ● bullet prefix (multi-byte UTF-8 character)', () => {
+  const output = '● ✓ context7 connected\n● ○ brave-search disabled\n';
+  assert.equal(getMcpDiscoveryState(output, 'context7'), 'enabled');
+  assert.equal(getMcpDiscoveryState(output, 'brave-search'), 'disabled');
+});
+
 test('assertMcpDiscovery distinguishes disabled-or-omitted Brave from enabled Brave', () => {
   assert.doesNotThrow(() => {
     assertMcpDiscovery(formattedOutput, {

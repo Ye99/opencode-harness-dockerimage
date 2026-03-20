@@ -41,14 +41,13 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY config/opencode.json /opt/opencode/opencode.base.json
 COPY --chmod=755 scripts/opencode-harness-entrypoint /usr/local/bin/opencode-harness-entrypoint
 COPY --chmod=755 scripts/install-superpowers.sh scripts/check-mcp-discovery.mjs scripts/port-drain-probe.mjs scripts/preflight-node-checks.mjs scripts/render-opencode-config.mjs scripts/validate-sources-lock.mjs scripts/verify-runtime.sh /opt/opencode/scripts/
-COPY vendor/ /opt/opencode/vendor/
-
-RUN ln -sf /usr/local/bin/python3 /usr/local/bin/python \
+RUN --mount=type=bind,source=vendor,target=/tmp/vendor \
+    ln -sf /usr/local/bin/python3 /usr/local/bin/python \
   && ln -sf /usr/local/bin/pip3 /usr/local/bin/pip \
-  && node /opt/opencode/scripts/validate-sources-lock.mjs /opt/opencode/vendor/sources.lock.json /opt/opencode/vendor/opencode-oca-auth /opt/opencode/vendor/superpowers \
+  && node /opt/opencode/scripts/validate-sources-lock.mjs /tmp/vendor/sources.lock.json /tmp/vendor/opencode-oca-auth /tmp/vendor/superpowers \
   && mkdir -p /opt/opencode/plugins \
-  && cp -R /opt/opencode/vendor/opencode-oca-auth /opt/opencode/plugins/opencode-oca-auth \
-  && /opt/opencode/scripts/install-superpowers.sh /opt/opencode/vendor/superpowers /opt/opencode
+  && cp -R /tmp/vendor/opencode-oca-auth /opt/opencode/plugins/opencode-oca-auth \
+  && /opt/opencode/scripts/install-superpowers.sh /tmp/vendor/superpowers /opt/opencode
 
 WORKDIR /workspace
 

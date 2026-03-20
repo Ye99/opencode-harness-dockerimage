@@ -9,6 +9,11 @@ function checkPort(hostPort) {
   const portStr = hostPort.slice(lastColon + 1);
   const port = Number(portStr);
 
+  if (Number.isNaN(port) || port < 0 || port > 65535) {
+    errors.push(`Invalid port in --check-port argument: ${hostPort}`);
+    return Promise.resolve();
+  }
+
   return new Promise((resolve) => {
     const server = net.createServer();
     server.once('error', () => {

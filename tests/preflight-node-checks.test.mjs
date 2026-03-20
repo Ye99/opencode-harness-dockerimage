@@ -51,6 +51,33 @@ test('--check-port with IPv6 wildcard :::0 succeeds (port 0 binds to any availab
   assert.doesNotMatch(result.stderr, /port is unavailable/i);
 });
 
+test('--check-port with non-numeric port exits with error mentioning Invalid port', async () => {
+  const result = await run(process.execPath, [script, '--check-port', 'abc:notaport'], {
+    cwd: projectRoot,
+  });
+
+  assert.notEqual(result.code, 0, 'should exit non-zero');
+  assert.match(result.stderr, /Invalid port/i);
+});
+
+test('--check-port with out-of-range port 99999 exits with error mentioning Invalid port', async () => {
+  const result = await run(process.execPath, [script, '--check-port', 'localhost:99999'], {
+    cwd: projectRoot,
+  });
+
+  assert.notEqual(result.code, 0, 'should exit non-zero');
+  assert.match(result.stderr, /Invalid port/i);
+});
+
+test('--check-port with negative port exits with error mentioning Invalid port', async () => {
+  const result = await run(process.execPath, [script, '--check-port', 'localhost:-1'], {
+    cwd: projectRoot,
+  });
+
+  assert.notEqual(result.code, 0, 'should exit non-zero');
+  assert.match(result.stderr, /Invalid port/i);
+});
+
 test('--check-port with IPv4 0.0.0.0:0 succeeds (port 0 binds to any available port)', async () => {
   const result = await run(process.execPath, [script, '--check-port', '0.0.0.0:0'], {
     cwd: projectRoot,

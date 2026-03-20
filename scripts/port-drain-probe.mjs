@@ -14,7 +14,9 @@ if (Number.isNaN(port) || port < 1 || port > 65535) {
   process.exit(1);
 }
 
-/** Max connection attempts before giving up (25 x 200ms = 5s total timeout). */
+/** Max connection attempts before giving up.
+ *  Best case (ECONNREFUSED): ~25 × 200ms ≈ 5s
+ *  Worst case (socket timeout): ~25 × 1200ms ≈ 30s */
 const MAX_PROBE_ATTEMPTS = 25;
 /** Millisecond delay between probe attempts. */
 const PROBE_INTERVAL_MS = 200;

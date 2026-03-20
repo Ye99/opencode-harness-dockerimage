@@ -88,7 +88,7 @@ async function readStdin() {
     chunks.push(chunk);
   }
 
-  return chunks.join('');
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 async function main() {

@@ -73,15 +73,15 @@ check_ports_metadata_and_brave_state() {
 check_config_visibility() {
   local output
   output="$(opencode debug config)"
-  grep -q '/opt/opencode/plugins/opencode-oca-auth' <<<"$output" || fail 'OpenCode config output does not expose baked opencode-oca-auth plugin'
-  grep -q '/opt/opencode/plugins/superpowers' <<<"$output" || fail 'OpenCode config output does not expose baked Superpowers plugin'
-  grep -q "$SUPERPOWERS_PLUGIN_DIR/skills" <<<"$output" || fail "OpenCode config output does not expose $SUPERPOWERS_PLUGIN_DIR/skills"
+  grep -qF '/opt/opencode/plugins/opencode-oca-auth' <<<"$output" || fail 'OpenCode config output does not expose baked opencode-oca-auth plugin'
+  grep -qF '/opt/opencode/plugins/superpowers' <<<"$output" || fail 'OpenCode config output does not expose baked Superpowers plugin'
+  grep -qF "$SUPERPOWERS_PLUGIN_DIR/skills" <<<"$output" || fail "OpenCode config output does not expose $SUPERPOWERS_PLUGIN_DIR/skills"
 }
 
 check_oca_models() {
   local output
   output="$(opencode models oca 2>/dev/null)" || fail 'OpenCode does not expose OCA models from the baked auth plugin'
-  grep -q 'oca/' <<<"$output" || fail 'OpenCode does not expose OCA models from the baked auth plugin'
+  grep -qF 'oca/' <<<"$output" || fail 'OpenCode does not expose OCA models from the baked auth plugin'
 }
 
 check_mcp_discovery() {
